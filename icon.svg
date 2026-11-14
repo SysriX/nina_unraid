@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="NetInventory">
+  <defs>
+    <linearGradient id="rand" x1="10" y1="8" x2="90" y2="92" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffd27a"/><stop offset=".35" stop-color="#ffa62b"/>
+      <stop offset=".75" stop-color="#f07a0a"/><stop offset="1" stop-color="#b85000"/>
+    </linearGradient>
+    <linearGradient id="feld" x1="20" y1="14" x2="80" y2="86" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4a4e57"/><stop offset=".5" stop-color="#2a2c32"/><stop offset="1" stop-color="#16171a"/>
+    </linearGradient>
+    <radialGradient id="licht" cx="34" cy="24" r="40" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff" stop-opacity=".2"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="led" cx="50%" cy="40%" r="60%">
+      <stop offset="0" stop-color="#fff3d6"/><stop offset=".45" stop-color="#ffb347"/><stop offset="1" stop-color="#e06a00"/>
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="1.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <!-- Gehäuse -->
+  <rect x="7" y="7" width="86" height="86" rx="20" fill="#0b0c0e"/>
+  <rect x="9" y="9" width="82" height="82" rx="18.5" fill="url(#rand)"/>
+  <rect x="13" y="13" width="74" height="74" rx="15" fill="url(#feld)"/>
+  <rect x="13" y="13" width="74" height="74" rx="15" fill="url(#licht)"/>
+  <!-- Verbindungen -->
+  <g stroke="#ff9a1a" stroke-width="2.6" stroke-linecap="round" fill="none" opacity=".9">
+    <path d="M50 36V50M50 50L30 64M50 50L50 66M50 50L70 64"/>
+  </g>
+  <!-- Router oben -->
+  <rect x="35" y="23" width="30" height="13" rx="4" fill="#1a1b1f" stroke="#ffb347" stroke-width="1.6"/>
+  <circle cx="42" cy="29.5" r="1.8" fill="#3ddc84" filter="url(#glow)"/>
+  <circle cx="48" cy="29.5" r="1.8" fill="#3ddc84" filter="url(#glow)"/>
+  <circle cx="54" cy="29.5" r="1.8" fill="#ffb347" filter="url(#glow)"/>
+  <circle cx="50" cy="50" r="4.2" fill="url(#led)" filter="url(#glow)"/>
+  <!-- Geräte unten -->
+  <g fill="#1a1b1f" stroke="#c9ccd2" stroke-width="1.5">
+    <rect x="20" y="63" width="20" height="13" rx="2.5"/>
+    <rect x="42" y="66" width="16" height="12" rx="2.5"/>
+    <rect x="60" y="63" width="20" height="13" rx="2.5"/>
+  </g>
+  <g stroke="#ff9a1a" stroke-width="1.6" stroke-linecap="round">
+    <path d="M24 68.5h8M24 71.5h12M46 70.5h8M46 73.5h5M64 68.5h12M64 71.5h7"/>
+  </g>
+</svg>
