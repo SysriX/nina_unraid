@@ -21,7 +21,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 DATA = os.environ.get("NINA_DATA", "/config")
 KONFIG_DATEI = os.path.join(DATA, "nina.json")
 SCHLUESSEL_DATEI = os.path.join(DATA, "schluessel.key")

@@ -1,4 +1,4 @@
-/* NINA – Ansichten: Übersicht, Geräte, Gerät, Neu gefunden, Netzwerke, Ereignisse */
+/* NINA – Ansichten: Übersicht, Geräte, Gerät, Nicht zugewiesen, Netzwerke, Ereignisse */
 "use strict";
 
 const typSymbol = t => h("span", { class: "typ-symbol", title: typName(t) }, (META.typen.find(x => x[0] === t) || [])[2] || "◇");
@@ -18,7 +18,7 @@ ANSICHT.uebersicht = { titel: "Übersicht", async zeigen(main) {
       h("div", { class: "kacheln" },
         kachel(u.geraete, "Geräte im Inventar", "#geraete"),
         kachel(u.online, "davon online", "#geraete?filter=online", "ok"),
-        kachel(u.neu, "neu gefunden", "#neu", u.neu ? "warn" : null),
+        kachel(u.neu + (u.agenten_frei || 0), "nicht zugewiesen", "#neu", u.neu + (u.agenten_frei || 0) ? "warn" : null),
         kachel(`${u.agenten_online}/${u.agenten}`, "HASS.Agents online", "#agenten"),
         kachel(u.netze.length, "Netzwerke", "#netzwerke")),
       h("div", { class: "zwei" },
@@ -240,27 +240,56 @@ async function schnittstelleDialog(g, x = null) {
   if (await dialog(x ? "Schnittstelle bearbeiten" : "Schnittstelle hinzufügen", f, kn)) zeige();
 }
 
-// ------------------------------------------------------------------ Neu gefunden
-ANSICHT.neu = { titel: "Neu gefunden", async zeigen(main) {
+// ------------------------------------------------------------------ Nicht zugewiesen
+const QUELLE_NAMEN = { scan: "Netzwerk-Scan", opnsense: "OPNsense", agent: "HASS.Agent", manuell: "von Hand" };
+let QUELLE_FILTER = "";
+ANSICHT.neu = { titel: "Nicht zugewiesen", async zeigen(main) {
   const laden = async () => {
-    const liste = (await api("GET", "/api/geraete?status=neu")).geraete;
-    const alleG = (await api("GET", "/api/geraete?status=aktiv")).geraete;
-    ZAHLEN.neu = liste.length;
+    const [n, a, akt] = await Promise.all([api("GET", "/api/geraete?status=neu"), api("GET", "/api/agenten"), api("GET", "/api/geraete?status=aktiv")]);
+    // Geräte-Funde (Scan, OPNsense, Agent mit eigenem Fund) + Agenten ganz ohne Gerät
+    const zeilen = [
+      ...n.geraete.map(g => ({ art: "geraet", g, quelle: g.agent ? "agent" : (g.quelle || "scan") })),
+      ...a.agenten.filter(x => !x.geraet_id).map(x => ({ art: "agent", a: x, quelle: "agent" })),
+    ];
+    ZAHLEN.neu = zeilen.length;
+    const anzahl = q => zeilen.filter(z => z.quelle === q).length;
+    const liste = zeilen.filter(z => !QUELLE_FILTER || z.quelle === QUELLE_FILTER);
+    const uebernehmen = async z => {
+      let g = z.g;
+      if (z.art === "agent") {      // Agent ohne Gerät: erst einen Fund anlegen, dann wie gewohnt übernehmen
+        await versuch(() => api("POST", `/api/agenten/${z.a.id}/verknuepfen`, { neu: true }));
+        const frisch = await api("GET", "/api/agenten");
+        const gid = (frisch.agenten.find(x => x.id === z.a.id) || {}).geraet_id;
+        if (!gid) return;
+        g = await api("GET", `/api/geraete/${gid}`);
+      }
+      if (await uebernehmenDialog(g)) laden(); else laden();
+    };
     leeren(main,
-      h("p", { class: "leise" }, "Vom Scan, der OPNsense oder einem HASS.Agent gefundene Geräte – sie kommen nie automatisch ins Inventar. Beim Übernehmen lassen sich doppelte Funde (z. B. Scan + Agent desselben PCs) gleich zusammenführen. Ignorierte tauchen nicht wieder auf."),
-      h("div", { class: "karte" }, h("h2", {}, `${liste.length} neue Geräte`, liste.length && darf("operator") ? h("span", { class: "rechts" },
-        h("button", { class: "klein", onclick: async () => { if (!(await bestaetigen(`Alle ${liste.length} ignorieren?`, "Alle ignorieren"))) return;
-          for (const g of liste) await api("POST", `/api/geraete/${g.id}/status`, { status: "ignoriert" }); laden(); } }, "Alle ignorieren")) : null),
+      h("p", { class: "leise" }, "Alles, was Netzwerk-Scan, OPNsense oder ein HASS.Agent gefunden hat und noch nicht im Inventar ist. Ins Inventar kommt ein Fund nur über „Übernehmen“ – dabei lassen sich doppelte Funde (z. B. Scan + Agent desselben PCs) gleich zusammenführen. Ignorierte tauchen nicht wieder auf."),
+      h("div", { class: "leiste" }, h("div", { class: "tabs" }, [["", `Alle (${zeilen.length})`], ["scan", `Netzwerk-Scan (${anzahl("scan")})`],
+        ["opnsense", `OPNsense (${anzahl("opnsense")})`], ["agent", `HASS.Agent (${anzahl("agent")})`]].map(([k, t]) =>
+        h("button", { class: k === QUELLE_FILTER ? "an" : "", onclick: () => { QUELLE_FILTER = k; laden(); } }, t))),
+        h("span", { class: "rechts" }, h("a", { href: "#einstellungen?tab=zeitplan" }, h("button", { class: "klein" }, "Zeitplan der Suche")))),
+      h("div", { class: "karte" }, h("h2", {}, `${liste.length} nicht zugewiesen`, liste.some(z => z.art === "geraet") && darf("operator") ? h("span", { class: "rechts" },
+        h("button", { class: "klein", onclick: async () => { const gs = liste.filter(z => z.art === "geraet"); if (!(await bestaetigen(`Alle ${gs.length} angezeigten Funde ignorieren?`, "Ignorieren"))) return;
+          for (const z of gs) await api("POST", `/api/geraete/${z.g.id}/status`, { status: "ignoriert" }); laden(); } }, "Alle ignorieren")) : null),
         tabelle([
-          { t: "", w: g => punkt(g.online ? "ok" : "") },
-          { t: "Name", w: g => h("b", {}, g.name) }, { t: "Vermutung", w: g => h("span", {}, typSymbol(g.typ), " ", g.typ_name) },
-          { t: "IP", w: g => h("span", { class: "mono" }, g.ip) }, { t: "MAC", w: g => h("span", { class: "mono" }, g.mac) },
-          { t: "Hersteller", w: g => g.hersteller }, { t: "Netz", w: g => g.netzwerk }, { t: "Quelle", w: g => g.agent ? "HASS.Agent" : g.quelle },
-          { t: "", w: g => darf("operator") ? h("div", { class: "knopfreihe" },
-            h("button", { class: "klein p", onclick: () => uebernehmenDialog(g).then(r => r && laden()) }, "Übernehmen"),
-            h("button", { class: "klein", onclick: () => zusammenDialog(g, alleG).then(r => r && laden()) }, "Zusammenführen"),
-            h("button", { class: "klein", onclick: async () => { await api("POST", `/api/geraete/${g.id}/status`, { status: "ignoriert" }); laden(); } }, "Ignorieren")) : null },
-        ], liste, { leer: "Nichts Neues – alles im Inventar.", klick: g => (location.hash = `#geraet?id=${g.id}`) })));
+          { t: "", w: z => punkt((z.g || z.a).online ? "ok" : "") },
+          { t: "Name", w: z => h("div", { class: "zwei-zeilen" }, h("b", {}, z.art === "agent" ? z.a.name : z.g.name),
+              z.art === "agent" ? h("small", {}, `HASS.Agent ${z.a.version || ""} · ${z.a.modell || ""}`) : z.g.hostname && z.g.hostname.split(".")[0].toLowerCase() !== z.g.name.toLowerCase() ? h("small", {}, z.g.hostname) : null) },
+          { t: "Vermutung", w: z => z.art === "agent" ? h("span", {}, typSymbol("pc"), " ", typName("pc")) : h("span", {}, typSymbol(z.g.typ), " ", z.g.typ_name) },
+          { t: "IP", w: z => z.g ? h("span", { class: "mono" }, z.g.ip) : "" }, { t: "MAC", w: z => z.g ? h("span", { class: "mono" }, z.g.mac) : "" },
+          { t: "Hersteller", w: z => z.g ? z.g.hersteller : "" }, { t: "Netz", w: z => z.g ? z.g.netzwerk : "" },
+          { t: "Quelle", w: z => marke(QUELLE_NAMEN[z.quelle] || z.quelle, z.quelle === "agent" ? "akz" : "") },
+          { t: "Gefunden", w: z => vorZeit(z.g ? z.g.geaendert : z.a.erstellt) },
+          { t: "", w: z => darf("operator") ? h("div", { class: "knopfreihe" },
+            h("button", { class: "klein p", onclick: () => uebernehmen(z) }, "Übernehmen"),
+            z.g ? h("button", { class: "klein", onclick: () => zusammenDialog(z.g, akt.geraete).then(r => r && laden()) }, "Zu Gerät hinzufügen") : null,
+            z.g ? h("button", { class: "klein", onclick: async () => { await api("POST", `/api/geraete/${z.g.id}/status`, { status: "ignoriert" }); laden(); } }, "Ignorieren")
+              : darf("admin") ? h("button", { class: "klein gefahr", onclick: async () => { if (await bestaetigen(`Agent „${z.a.name}“ entfernen? Meldet er sich wieder, taucht er hier neu auf.`, "Entfernen")) { await api("DELETE", `/api/agenten/${z.a.id}`); laden(); } } }, "Entfernen") : null) : null },
+        ], liste, { leer: zeilen.length ? "Für diese Quelle gibt es nichts Neues." : "Nichts Neues – alles im Inventar.",
+          klick: z => z.g && (location.hash = `#geraet?id=${z.g.id}`) })));
   };
   await laden();
   alle(30, laden);
@@ -282,7 +311,7 @@ async function uebernehmenDialog(g) {
         ? h("input", { type: "checkbox", checked: wahl.has(x.id), disabled: !!ziel, onchange: e => { e.target.checked ? wahl.add(x.id) : wahl.delete(x.id); } })
         : h("input", { type: "radio", name: "ziel", checked: ziel === x.id, title: "stattdessen in dieses Inventar-Gerät übernehmen",
             onclick: e => { ziel = ziel === x.id ? null : x.id; e.target.checked = ziel === x.id; zeichne(); } }) },
-    { t: "Gerät", w: x => h("div", { class: "zwei-zeilen" }, h("b", {}, x.name), h("small", {}, x.status === "neu" ? "neu gefunden · " + quelle(x) : "im Inventar")) },
+    { t: "Gerät", w: x => h("div", { class: "zwei-zeilen" }, h("b", {}, x.name), h("small", {}, x.status === "neu" ? "nicht zugewiesen · " + quelle(x) : "im Inventar")) },
     { t: "Typ", w: x => h("span", {}, typSymbol(x.typ), " ", x.typ_name) },
     { t: "IP / MAC", w: x => h("div", { class: "zwei-zeilen mono" }, x.ip, h("small", {}, x.mac)) },
     { t: "Passt wegen", w: x => x.gruende.length ? x.gruende.map(r => marke(r, "ok")) : h("span", { class: "leise" }, "–") },
@@ -307,7 +336,7 @@ async function uebernehmenDialog(g) {
 async function zusammenDialog(g, alleG) {
   const f = h("div", {}, h("p", { class: "leise" }, `Die Schnittstellen von „${g.name}“ (${g.ip} ${g.mac}) wandern zum gewählten Gerät, „${g.name}“ wird entfernt.`),
     feld("Ziel-Gerät", auswahl("ziel", alleG.map(x => [x.id, `${x.name}${x.ip ? " – " + x.ip : ""}`]), "")));
-  return dialog("Zusammenführen", f, [["Abbrechen", null], ["Zusammenführen", () => versuch(() => api("POST", `/api/geraete/${g.id}/zusammenfuehren`, lesenForm(f)), "Zusammengeführt"), "p"]]);
+  return dialog("Zu einem Inventar-Gerät hinzufügen", f, [["Abbrechen", null], ["Zusammenführen", () => versuch(() => api("POST", `/api/geraete/${g.id}/zusammenfuehren`, lesenForm(f)), "Zusammengeführt"), "p"]]);
 }
 
 // ------------------------------------------------------------------ Netzwerke

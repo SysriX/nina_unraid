@@ -5,26 +5,28 @@
 ANSICHT.agenten = { titel: "HASS.Agent", async zeigen(main) {
   const laden = async () => {
     const d = await api("GET", "/api/agenten");
+    const offen = d.agenten.filter(a => !a.geraet_id || a.geraet_status !== "aktiv").length;
+    d.agenten = d.agenten.filter(a => a.geraet_id && a.geraet_status === "aktiv");   // nicht zugewiesene stehen unter Inventar › Nicht zugewiesen
     const m = d.mqtt;
     leeren(main,
       h("div", { class: "karte" }, h("h2", {}, "MQTT-Verbindung", m.verbunden ? marke("verbunden", "ok") : m.aktiv ? marke("getrennt", "bad") : marke("aus"),
         h("span", { class: "rechts" }, darf("admin") ? h("a", { href: "#einstellungen?tab=mqtt" }, h("button", { class: "klein" }, "Einstellungen")) : null)),
         h("p", { class: "leise", style: { margin: 0 } }, m.aktiv ? `${m.host} · ${m.status} · ${m.nachrichten} Nachrichten empfangen`
           : "Noch nicht eingerichtet. HASS.Agent schickt seine Sensoren und Befehle an den MQTT-Broker von Home Assistant (z. B. das Mosquitto-Add-on). NINA hört dort mit – unter Einstellungen › MQTT den Broker eintragen.")),
-      h("div", { class: "karte" }, h("h2", {}, `${d.agenten.length} Agenten`),
+      offen ? h("div", { class: "karte" }, h("p", { style: { margin: 0 } }, `${offen} ${offen === 1 ? "Agent ist" : "Agenten sind"} noch keinem Gerät im Inventar zugewiesen – `,
+        h("a", { href: "#neu" }, "unter „Nicht zugewiesen“ übernehmen"), ".")) : null,
+      h("div", { class: "karte" }, h("h2", {}, `${d.agenten.length} zugewiesene Agenten`),
         tabelle([
           { t: "", w: a => punkt(a.online ? "ok" : "") },
           { t: "Name", w: a => h("div", { class: "zwei-zeilen" }, h("b", {}, a.name), h("small", {}, a.kennung)) },
           { t: "Version", w: a => a.version }, { t: "System", w: a => a.modell },
           { t: "Werte / Befehle", w: a => `${a.werte} / ${a.befehle}`, z: 1 },
-          { t: "Gerät", w: a => a.geraet_id ? h("span", {}, h("a", { href: `#geraet?id=${a.geraet_id}` }, a.geraet), " ", a.geraet_status === "neu" ? marke("neu", "warn") : null)
-              : marke("nicht verknüpft", "warn") },
+          { t: "Gerät", w: a => h("a", { href: `#geraet?id=${a.geraet_id}` }, a.geraet) },
           { t: "Zuletzt", w: a => vorZeit(a.zuletzt) },
           { t: "", w: a => darf("admin") ? h("div", { class: "knopfreihe" },
-            a.geraet_status === "neu" ? h("button", { class: "klein p", onclick: async () => { const g = await api("GET", `/api/geraete/${a.geraet_id}`); if (await uebernehmenDialog(g)) laden(); } }, "Übernehmen") : null,
             h("button", { class: "klein", onclick: () => verknuepfenDialog(a).then(r => r && laden()) }, "Verknüpfen"),
             h("button", { class: "klein gefahr", onclick: async () => { if (await bestaetigen(`Agent „${a.name}“ entfernen? Meldet er sich wieder, taucht er neu auf.`, "Entfernen")) { await versuch(() => api("DELETE", `/api/agenten/${a.id}`), "Entfernt"); laden(); } } }, "Entfernen")) : null },
-        ], d.agenten, { leer: "Noch kein HASS.Agent gefunden.", klick: a => a.geraet_id && (location.hash = `#geraet?id=${a.geraet_id}`) })));
+        ], d.agenten, { leer: offen ? "Noch kein Agent zugewiesen." : "Noch kein HASS.Agent gefunden.", klick: a => a.geraet_id && (location.hash = `#geraet?id=${a.geraet_id}`) })));
   };
   await laden();
   alle(15, laden);
@@ -40,7 +42,7 @@ async function verknuepfenDialog(a) {
 }
 
 // ------------------------------------------------------------------ Sensor-Erkennung
-ANSICHT.muster = { titel: "Sensor-Erkennung", async zeigen(main) {
+ANSICHT.muster = { titel: "HASS.Agent Sensor-Erkennung", async zeigen(main) {
   const [d] = await Promise.all([api("GET", "/api/muster"), mdiLaden().catch(() => {})]);
   const ziel = new URLSearchParams(location.hash.split("?")[1] || "").get("ziel") || "sensor";
   const liste = d.muster.filter(m => m.ziel === ziel);
@@ -117,11 +119,11 @@ function allgemeinTab(a) {
   const f = h("div", {},
     h("div", { class: "raster" },
       feld("Name dieser Installation", eingabe("name", a.name), "erscheint in Home Assistant"),
-      feld("Neu gefundene Geräte", auswahl("neue_geraete", [["pruefen", "Unter „Neu gefunden“ zum Prüfen"], ["nein", "Nicht anlegen (nur Bekannte aktualisieren)"]], a.neue_geraete), "Ins Inventar kommt ein Gerät nur, wenn es übernommen wird"),
+      feld("Neu gefundene Geräte", auswahl("neue_geraete", [["pruefen", "Unter „Nicht zugewiesen“ aufführen"], ["nein", "Nicht anlegen (nur Bekannte aktualisieren)"]], a.neue_geraete), "Ins Inventar kommt ein Gerät nur, wenn es übernommen wird"),
       feld("Überwachte Geräte anpingen alle … s", eingabe("ueberwachen_intervall", a.ueberwachen_intervall, { type: "number", min: 15 })),
       feld("WoL-Port", auswahl("wol_port", [["9", "9 (Standard)"], ["7", "7"]], a.wol_port)),
       feld("Ereignisse aufheben (Tage)", eingabe("ereignisse_tage", a.ereignisse_tage, { type: "number", min: 7 }))),
-    haken("Neue HASS.Agents unter „Neu gefunden“ aufführen", a.agent_geraete_anlegen, "Sonst nur verknüpfen, wenn ein Gerät mit gleichem Namen im Inventar ist", "agent_geraete_anlegen").el);
+    haken("Für neue HASS.Agents gleich einen Fund anlegen", a.agent_geraete_anlegen, "Sonst steht der Agent ohne Gerät unter „Nicht zugewiesen“ (Übernehmen legt es dann an); mit gleichnamigem Inventar-Gerät wird immer verknüpft", "agent_geraete_anlegen").el);
   return h("div", {}, h("div", { class: "karte" }, h("h2", {}, "Allgemein"), f),
     h("div", { class: "karte" }, h("h2", {}, "Zusatzfelder für Geräte"), h("p", { class: "leise klein-t" }, "Eigene Angaben je Gerät (z. B. Garantie bis, Kostenstelle, Lieferant) – ohne Datenbank-Umbau, gespeichert im Feld „extra“ und auch an Home Assistant übergeben."), zf),
     h("div", { class: "leiste" }, h("span", { class: "rechts" }, h("button", { class: "p", onclick: async () => {
@@ -309,7 +311,7 @@ function zeitplanTab() {
         "Ping/nmap-Scan der eingetragenen Netze (je Netz eigenes Intervall). Das Zeitfenster gilt für alle Netze."),
       karte("opnsense", ops, "ARP-Tabelle und DHCP-Leases der OPNsense über alle VLANs – findet auch Geräte in fremden Netzen samt MAC."),
       karte("agent", h("div", {}, ag, agExtra), "HASS.Agent-Werte kommen laufend per MQTT. Der Abgleich verknüpft Agenten mit Geräten, übernimmt gemeldete Adressen und setzt stumme Agenten offline."),
-      h("div", { class: "leiste" }, h("span", { class: "leise klein-t" }, "Neue Funde aus allen Läufen landen unter „Neu gefunden“."),
+      h("div", { class: "leiste" }, h("span", { class: "leise klein-t" }, "Neue Funde aus allen Läufen landen unter Inventar › Nicht zugewiesen."),
         h("span", { class: "rechts" }, darf("admin") ? h("button", { class: "p", onclick: async () => {
           await versuch(() => api("POST", "/api/zeitplan", { scan: scan.werte(), opnsense: ops.werte(), agent: { ...ag.werte(), ...lesenForm(agExtra) }, netze: [...netzWerte.values()] }), "Zeitplan gespeichert");
           laden();

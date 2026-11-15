@@ -150,12 +150,13 @@ function kopieren(text) {
 
 // ------------------------------------------------------------------ Navigation / Rahmen
 const NAVI = [
-  ["", [["uebersicht", "Übersicht"]]],
-  ["Inventar", [["geraete", "Geräte"], ["neu", "Neu gefunden", null, null, "neu"], ["netzwerke", "Netzwerke"], ["kataloge", "Kataloge"], ["ereignisse", "Ereignisse"]]],
-  ["HASS.Agent", [["agenten", "Agenten"], ["muster", "Sensor-Erkennung"]]],
-  ["System", [["einstellungen", "Einstellungen", null, "admin"], ["benutzer", "Benutzer & API", null, "admin"],
-              ["protokoll", "Protokoll", null, "operator"]]],
+  ["", [["uebersicht", "Übersicht"], ["ereignisse", "Ereignisse"]]],
+  ["Inventar", [["geraete", "Geräte"], ["neu", "Nicht zugewiesen", null, null, "neu"]]],
+  ["HASS.Agent", [["agenten", "Agenten"]]],
 ];
+// abgesetzter Einstellungsbereich unten in der Seitenleiste
+const NAVI_SYSTEM = [["einstellungen", "Einstellungen", null, "admin"], ["netzwerke", "Netzwerke"], ["kataloge", "Kataloge"],
+  ["muster", "HASS.Agent Sensor-Erkennung"], ["benutzer", "Benutzer & API", null, "admin"], ["protokoll", "Protokoll", null, "operator"]];
 let ZAHLEN = {};
 let AKTUALISIEREN = null;   // Timer der aktuellen Ansicht
 
@@ -166,10 +167,14 @@ function rahmen() {
   const navi = h("aside", { id: "navi" },
     h("div", { class: "logo" }, h("img", { src: "/static/logo-kurz-dunkel.svg", alt: "NINA", class: "wortmarke nur-dunkel" }), h("img", { src: "/static/logo-kurz-hell.svg", alt: "NINA", class: "wortmarke nur-hell" }),
       h("small", {}, META.name !== "NINA" ? META.name : "Network INventory Assistant")),
-    NAVI.map(([gruppe, eintraege]) => [gruppe ? h("h4", {}, gruppe) : null,
-      eintraege.filter(([, , , rolle]) => !rolle || darf(rolle)).map(([k, t, , , zahl]) =>
-        h("a", { class: "nav" + (r.name === k || (k === "geraete" && r.name === "geraet") ? " an" : ""), href: "#" + k,
-          onclick: () => $("#navi").classList.remove("offen") }, t, zahl && ZAHLEN[zahl] ? h("span", { class: "zahl" }, ZAHLEN[zahl]) : null))]));
+    NAVI.map(([gruppe, eintraege]) => [gruppe ? h("h4", {}, gruppe) : null, eintraege.map(navLink)]),
+    h("div", { class: "navi-system" }, h("h4", {}, h("span", { class: "navi-system-symbol" }, "⚙"), "System & Einstellungen"),
+      NAVI_SYSTEM.map(navLink)));
+  function navLink([k, t, , rolle, zahl]) {
+    if (rolle && !darf(rolle)) return null;
+    return h("a", { class: "nav" + (r.name === k || (k === "geraete" && r.name === "geraet") ? " an" : ""), href: "#" + k,
+      onclick: () => $("#navi").classList.remove("offen") }, t, zahl && ZAHLEN[zahl] ? h("span", { class: "zahl" }, ZAHLEN[zahl]) : null);
+  }
   const oben = h("div", { class: "oben" },
     h("button", { class: "menu-knopf", onclick: () => $("#navi").classList.toggle("offen") }, "☰"),
     h("h1", { id: "titel" }, ""),
@@ -202,7 +207,7 @@ function alle(sekunden, fn) {
 window.addEventListener("hashchange", () => { if (ICH) zeige(); });
 
 async function zahlenLaden() {
-  try { const u = await api("GET", "/api/uebersicht"); ZAHLEN = { neu: u.neu }; } catch { /* egal */ }
+  try { const u = await api("GET", "/api/uebersicht"); ZAHLEN = { neu: u.neu + (u.agenten_frei || 0) }; } catch { /* egal */ }
 }
 
 async function start() {

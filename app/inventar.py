@@ -413,6 +413,7 @@ def uebersicht(ich: dict = Depends(LESER)):
                 "neu": zahl(Geraet.status == "neu"), "ignoriert": zahl(Geraet.status == "ignoriert"),
                 "agenten": s.scalar(select(func.count(Agent.id))) or 0,
                 "agenten_online": s.scalar(select(func.count(Agent.id)).where(Agent.online.is_(True))) or 0,
+                "agenten_frei": s.scalar(select(func.count(Agent.id)).where(Agent.geraet_id.is_(None))) or 0,
                 "typen": [{"typ": k, "name": tn.get(k, k), "anzahl": v} for k, v in sorted(typen.items(), key=lambda x: -x[1])],
                 "netze": netze,
                 "ereignisse": [{"zeit": iso(e.zeit), "art": e.art, "text": e.text, "geraet_id": e.geraet_id, "geraet": n or ""} for e, n in ev]}

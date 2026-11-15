@@ -10,9 +10,12 @@ Home-Assistant-Integration: [nina_ha_integration](https://github.com/SysriX/nina
 
 ![Geräteliste](docs/images/liste.png)
 ![Infokarte eines Rechners mit HASS.Agent und Wake-on-LAN](docs/images/geraet.png)
+![Nicht zugewiesene Funde aus Scan, OPNsense und HASS.Agent](docs/images/neu.png)
 *Beispieldaten*
 
-> **Stand 1.3.0:** Symbol-Auswahl mit Suche für Gerätetypen (Zeichen/Emoji für NINA und alle 7.188 Material Design Icons für Home Assistant, Suche auch mit deutschen Begriffen wie „drucker“ oder „wlan“), ebenso in der Sensor-Erkennung.
+> **Stand 1.4.0:** Menü neu gegliedert: Inventar = Geräte + **Nicht zugewiesen** (alle offenen Funde aus Scan, OPNsense und HASS.Agent, auch Agenten ohne Gerät, mit Filter nach Quelle); unter HASS.Agent nur noch zugewiesene Agenten; Einstellungen, Netzwerke, Kataloge, HASS.Agent Sensor-Erkennung, Benutzer & API und Protokoll im abgesetzten Bereich „System & Einstellungen“.
+>
+> **1.3.0:** Symbol-Auswahl mit Suche für Gerätetypen (Zeichen/Emoji für NINA und alle 7.188 Material Design Icons für Home Assistant, Suche auch mit deutschen Begriffen wie „drucker“ oder „wlan“), ebenso in der Sensor-Erkennung.
 >
 > **1.2.0:** Zeitplan (Einstellungen › Zeitplan) für Netzwerk-Scan, OPNsense-Abfrage und Agent-Abgleich: an/aus, Intervall, Zeitfenster (auch über Mitternacht) und Wochentage, Status mit letztem/nächstem Lauf und „Jetzt ausführen“. Kein neues Datenbank-Schema.
 >
@@ -27,7 +30,7 @@ Home-Assistant-Integration: [nina_ha_integration](https://github.com/SysriX/nina
 | **Geräte** | Name, **Haupttyp + weitere Typen** (z. B. Server + Virtuelle Maschine), **Benutzer** (wer daran arbeitet), angemeldeter Benutzer (vom HASS.Agent), Hersteller, Modell, Betriebssystem, Serien-/Inventarnummer, Standort, Raum-Kürzel für HA, Schlagwörter, Notizen, **eigene Zusatzfelder** |
 | **Schnittstellen** | je Gerät beliebig viele: IP, MAC, Hostname, MAC-Hersteller, Netz, primär, feste IP |
 | **Netzwerke** | mehrere Netze/VLANs, je Netz Scan an/aus, Intervall, Methode (nmap, Ping, nur OPNsense) und Wake-on-LAN-Weg |
-| **Automatisch finden** | nmap/Ping-Scan (im eigenen Netz mit MAC), **OPNsense** ARP-Tabelle + DHCP-Leases (ISC, Kea, Dnsmasq) für alle VLANs, **HASS.Agent**. Neue Geräte landen **immer** unter „Neu gefunden“; ins Inventar kommen sie nur durch **Übernehmen** – dabei schlägt NINA passende andere Funde vor (gleicher Name, IP oder MAC, z. B. Scan + HASS.Agent desselben PCs) und führt die ausgewählten zusammen. Typ wird aus Hersteller/Hostname geraten |
+| **Automatisch finden** | nmap/Ping-Scan (im eigenen Netz mit MAC), **OPNsense** ARP-Tabelle + DHCP-Leases (ISC, Kea, Dnsmasq) für alle VLANs, **HASS.Agent**. Neue Geräte landen **immer** unter „Nicht zugewiesen“; ins Inventar kommen sie nur durch **Übernehmen** – dabei schlägt NINA passende andere Funde vor (gleicher Name, IP oder MAC, z. B. Scan + HASS.Agent desselben PCs) und führt die ausgewählten zusammen. Typ wird aus Hersteller/Hostname geraten |
 | **Kataloge** | **Gerätetypen** frei pflegbar (Name, Symbol, HA-Symbol, Reihenfolge); **Hersteller und Modelle** (Modell mit Typ, z. B. Brother · HL-2040 · Drucker). Im Geräteformular stehen zum gewählten Typ passende Hersteller/Modelle oben; was neu eingetragen wird, kommt automatisch in den Katalog. Umbenennen im Katalog ändert die Angabe an allen Geräten |
 | **Zeitplan** | je Quelle einstellbar: **Netzwerk-Scan** (Intervall je Netz, gemeinsames Zeitfenster), **OPNsense-Abfrage** (ARP/DHCP), **Agent-Abgleich** (Agenten verknüpfen, Adressen übernehmen, stumme Agenten nach einstellbarer Zeit offline, optional um Neumeldung bitten) – mit Zeitfenster, Wochentagen, letztem/nächstem Lauf und „Jetzt ausführen“ |
 | **Online-Status** | aus Scans, ARP, Ping-Überwachung (einstellbar je Gerät) und HASS.Agent; Ereignis-Verlauf (neu, online/offline, IP geändert, WoL, Befehle) |
