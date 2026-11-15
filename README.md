@@ -13,6 +13,8 @@ Home-Assistant-Integration: [nina_ha_integration](https://github.com/SysriX/nina
 ![Nicht zugewiesene Funde aus Scan, OPNsense und HASS.Agent](docs/images/neu.png)
 *Beispieldaten*
 
+> **2.3.0:** Geräteliste nach Haupttyp gruppiert (Reihenfolge wie im Typen-Katalog), Gruppen auf- und zuklappbar, Anzahl online je Gruppe; Gruppierung abschaltbar. Einstellung bleibt im Browser gespeichert.
+>
 > **2.2.2:** Modell-Vorschläge zeigen immer den Hersteller mit (z. B. „U6-Lite – Ubiquiti · Switch / Access-Point“), Hersteller-Vorschläge „2 Modelle passend zum Typ“.
 >
 > **2.2.1:** Auswahl von Hersteller, Modell und WoL-MAC über eine eigene Vorschlagsliste: Modellname fett, Hersteller und Typ klein daneben (vorher zeigte der Browser teils nur den Typ).

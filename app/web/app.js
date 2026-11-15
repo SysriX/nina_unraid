@@ -134,7 +134,9 @@ function lesenForm(el) {
 }
 
 /** Tabelle: spalten = [{t, w: zeile => wert|Node, z: rechtsbündig, sort: zeile => Sortierwert}] */
-function tabelle(spalten, zeilen, { klick, leer = "Keine Einträge", an, sortierbar, klebend } = {}) {
+/** gruppen (optional): { schluessel: r => k, reihenfolge: [k…], kopf: (k, zeilen) => Inhalt, zu: Set (eingeklappt), umschalten: k => … }
+ *  – Zeilen werden nach Gruppe geordnet (innerhalb sortiert), je Gruppe eine Kopfzeile über die ganze Breite. */
+function tabelle(spalten, zeilen, { klick, leer = "Keine Einträge", an, sortierbar, klebend, gruppen } = {}) {
   if (!zeilen || !zeilen.length) return h("div", { class: "leer" }, leer);
   // klebend: letzte Spalte (Knöpfe) bleibt rechts sichtbar – automatisch, wenn die letzte Spalte keine Überschrift hat
   if (klebend === undefined) klebend = spalten.length > 3 && spalten[spalten.length - 1].t === "";
@@ -150,8 +152,20 @@ function tabelle(spalten, zeilen, { klick, leer = "Keine Einträge", an, sortier
       h("thead", {}, h("tr", {}, spalten.map(s => h("th", { class: s.z ? "z" : "", style: sortierbar ? { cursor: "pointer" } : null,
         onclick: sortierbar ? () => { if (sortSp === s) auf = !auf; else { sortSp = s; auf = true; } zeichnen(); } : null },
         s.t, sortSp === s ? (auf ? " ▴" : " ▾") : "")))),
-      h("tbody", {}, z.map(r => h("tr", { class: (klick ? "klick " : "") + (an && an(r) ? "an" : ""), onclick: klick ? e => { if (!e.target.closest("button,a,input,select")) klick(r); } : null },
-        spalten.map(s => { const v = s.w(r); return h("td", { class: s.z ? "z" : "" }, v === null || v === undefined ? "" : v); }))))));
+      h("tbody", {}, (gruppen ? gruppiert(z) : z.map(zeile)))));
+  };
+  const zeile = r => h("tr", { class: (klick ? "klick " : "") + (an && an(r) ? "an" : ""), onclick: klick ? e => { if (!e.target.closest("button,a,input,select")) klick(r); } : null },
+    spalten.map(s => { const v = s.w(r); return h("td", { class: s.z ? "z" : "" }, v === null || v === undefined ? "" : v); }));
+  const gruppiert = z => {
+    const nach = new Map();
+    for (const r of z) { const k = gruppen.schluessel(r); if (!nach.has(k)) nach.set(k, []); nach.get(k).push(r); }
+    const rf = gruppen.reihenfolge || [];
+    const keys = [...nach.keys()].sort((a, b) => ((rf.indexOf(a) + 1 || 1e6) - (rf.indexOf(b) + 1 || 1e6)) || String(a).localeCompare(String(b), "de"));
+    return keys.flatMap(k => {
+      const rs = nach.get(k), zu = gruppen.zu && gruppen.zu.has(k);
+      return [h("tr", { class: "gruppe" + (zu ? " zu" : ""), onclick: gruppen.umschalten ? () => { gruppen.umschalten(k); zeichnen(); } : null },
+        h("td", { colspan: spalten.length }, h("span", { class: "gr-pfeil" }, zu ? "▸" : "▾"), gruppen.kopf(k, rs))), ...(zu ? [] : rs.map(zeile))];
+    });
   };
   zeichnen();
   return wrap;

@@ -49,6 +49,9 @@ function ereignisListe(liste, mitGeraet) {
 
 // ------------------------------------------------------------------ Geräte
 const FILTER = { suche: "", typ: "", netz: "", online: "", status: "aktiv" };
+const speicher = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem("ni." + k)); localStorage.setItem("ni." + k, JSON.stringify(v)); } catch { return null; } };
+let GRUPPIERT = speicher("gruppiert") ?? true;
+const GRUPPEN_ZU = new Set(speicher("gruppen_zu") || []);
 ANSICHT.geraete = { titel: "Geräte", async zeigen(main, q) {
   if (q.get("typ")) FILTER.typ = q.get("typ");
   if (q.get("filter") === "online") FILTER.online = "online";
@@ -59,7 +62,12 @@ ANSICHT.geraete = { titel: "Geräte", async zeigen(main, q) {
     const liste = daten.filter(g => (!FILTER.typ || (g.typen || [g.typ]).includes(FILTER.typ)) && (!FILTER.netz || g.netzwerk === FILTER.netz)
       && (!FILTER.online || (FILTER.online === "online") === g.online)
       && (!s || [g.name, g.ip, g.mac, g.hostname, g.benutzer, g.angemeldet, g.hersteller, g.modell, g.standort, ...(g.tags || [])].some(x => (x || "").toLowerCase().includes(s))));
-    leeren(box, h("div", { class: "karte" }, h("h2", {}, `${liste.length} von ${daten.length} Geräten`),
+    leeren(box, h("div", { class: "karte" }, h("h2", {}, `${liste.length} von ${daten.length} Geräten`,
+        h("span", { class: "rechts" }, GRUPPIERT ? [
+          h("button", { class: "klein", onclick: () => { META.typen.forEach(t => GRUPPEN_ZU.add(t[0])); speicher("gruppen_zu", [...GRUPPEN_ZU]); zeichnen(); } }, "Alle zuklappen"),
+          h("button", { class: "klein", onclick: () => { GRUPPEN_ZU.clear(); speicher("gruppen_zu", []); zeichnen(); } }, "Alle aufklappen")] : null,
+          h("button", { class: "klein" + (GRUPPIERT ? " an" : ""), title: "Nach Haupttyp (Katalog) gruppieren", onclick: () => { GRUPPIERT = !GRUPPIERT; speicher("gruppiert", GRUPPIERT); zeichnen(); } },
+            GRUPPIERT ? "Nach Typ gruppiert" : "Nach Typ gruppieren"))),
       tabelle([
         { t: "", w: g => g.online ? punkt("ok") : punkt(""), sort: g => g.online ? 0 : 1 },
         { t: "Name", w: g => h("div", { class: "zwei-zeilen" }, h("b", {}, g.name), g.hostname && g.hostname.split(".")[0].toLowerCase() !== g.name.toLowerCase() ? h("small", {}, g.hostname) : null), sort: g => g.name.toLowerCase() },
@@ -74,7 +82,11 @@ ANSICHT.geraete = { titel: "Geräte", async zeigen(main, q) {
         { t: "", w: g => h("div", { class: "knopfreihe" }, g.agent ? marke("Agent", g.agent.online ? "ok" : "") : null,
             g.wol && !g.online && darf("operator") ? h("button", { class: "klein", title: "Wake-on-LAN", onclick: () => wecken(g) }, "Wecken") : null,
             darf("operator") && ZAHLEN.neu ? h("button", { class: "klein", title: "Einen noch nicht zugewiesenen Fund diesem Gerät hinzufügen", onclick: () => fundHinzufuegenDialog(g).then(r => r && laden()) }, "+ Fund") : null) },
-      ], liste, { klick: g => (location.hash = `#geraet?id=${g.id}`), leer: daten.length ? "Kein Gerät passt zum Filter" : "Noch keine Geräte – Netzwerk anlegen und scannen oder von Hand hinzufügen", sortierbar: true })));
+      ], liste, { klick: g => (location.hash = `#geraet?id=${g.id}`), leer: daten.length ? "Kein Gerät passt zum Filter" : "Noch keine Geräte – Netzwerk anlegen und scannen oder von Hand hinzufügen", sortierbar: true,
+        gruppen: GRUPPIERT ? { schluessel: g => g.typ || "unbekannt", reihenfolge: META.typen.map(t => t[0]), zu: GRUPPEN_ZU,
+          umschalten: k => { GRUPPEN_ZU.has(k) ? GRUPPEN_ZU.delete(k) : GRUPPEN_ZU.add(k); speicher("gruppen_zu", [...GRUPPEN_ZU]); },
+          kopf: (k, rs) => [typSymbol(k), " ", h("b", {}, typName(k)), h("span", { class: "leise" }, ` ${rs.length} ${rs.length === 1 ? "Gerät" : "Geräte"}`),
+            rs.some(g => g.online) ? h("span", { class: "leise" }, ` · ${rs.filter(g => g.online).length} online`) : null] } : null })));
   };
   const laden = async () => { daten = (await api("GET", `/api/geraete?status=${FILTER.status}`)).geraete; zeichnen(); };
   const netze = [...new Set((await api("GET", "/api/netzwerke")).netzwerke.map(n => n.name))];

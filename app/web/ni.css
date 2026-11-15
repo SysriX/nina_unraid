@@ -202,3 +202,11 @@ main{max-width:none}
 .vs-eintrag small{color:var(--leise);margin-left:auto;text-align:right}
 .vs-eintrag.an,.vs-eintrag:hover{background:color-mix(in srgb,var(--akzent) 14%,transparent)}
 .vs-gruppe{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--leise);padding:6px 9px 2px}
+
+/* Gruppen-Kopfzeilen in Tabellen (Geräte nach Typ) */
+.tab-wrap tr.gruppe td{position:static !important;box-shadow:none !important;background:color-mix(in srgb,var(--akzent) 8%,transparent) !important;
+  padding:8px 10px;cursor:pointer;user-select:none;border-top:1px solid var(--rand);white-space:nowrap}
+.tab-wrap tr.gruppe:hover td{background:color-mix(in srgb,var(--akzent) 14%,transparent) !important}
+.tab-wrap tr.gruppe .gr-pfeil{display:inline-block;width:16px;color:var(--leise)}
+.tab-wrap tr.gruppe .typ-symbol{margin-right:2px}
+button.klein.an{border-color:var(--akzent);color:var(--akzent)}
