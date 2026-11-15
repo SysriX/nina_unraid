@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="NINA">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="15 13 70 70" role="img" aria-label="NINA">
   <defs>
     <linearGradient id="rand" x1="10" y1="8" x2="90" y2="92" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#c4f2ff"/><stop offset=".35" stop-color="#5fd2ff"/>
@@ -19,37 +19,41 @@
     <linearGradient id="anthrazit" x1="0" y1="0" x2="0" y2="100" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#555962"/><stop offset="1" stop-color="#25272c"/>
     </linearGradient>
-    <linearGradient id="seele" x1="0" y1="17" x2="0" y2="41" gradientUnits="userSpaceOnUse">
+    <linearGradient id="seele" x1="0" y1="28" x2="0" y2="52" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#b8f0ff"/><stop offset=".45" stop-color="#4fd0ff"/><stop offset="1" stop-color="#0d8ee0"/>
     </linearGradient>
-    <linearGradient id="nspiegel" x1="0" y1="17" x2="0" y2="31" gradientUnits="userSpaceOnUse">
+    <linearGradient id="nspiegel" x1="0" y1="28" x2="0" y2="40" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#fff" stop-opacity=".6"/><stop offset="1" stop-color="#fff" stop-opacity=".1"/>
     </linearGradient>
-    <path id="n" d="M38.50 40.94L32.00 40.94L37.43 21.85L38.86 21.85L42.21 28.15ZM50.62 20.01L55.31 29.19L59.43 17.50L68.00 17.50L60.90 40.98L50.82 40.98L38.90 17.50L47.27 17.50Q47.87 17.43 48.89 18.10Q49.92 18.77 50.62 20.01Z"/>
-    <path id="nf" d="M37.43 21.85L38.67 17.50L38.90 17.50L41.11 21.85Z"/>
+    <radialGradient id="halo" cx="50" cy="40" r="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4fd0ff" stop-opacity=".55"/><stop offset=".55" stop-color="#4fd0ff" stop-opacity=".15"/><stop offset="1" stop-color="#4fd0ff" stop-opacity="0"/>
+    </radialGradient>
+    <path id="n" d="M38.50 51.72L32.00 51.72L37.43 32.63L38.86 32.63L42.21 38.93ZM50.62 30.79L55.31 39.97L59.43 28.28L68.00 28.28L60.90 51.75L50.82 51.75L38.90 28.28L47.27 28.28Q47.87 28.21 48.89 28.88Q49.92 29.55 50.62 30.79Z"/>
+    <path id="nf" d="M37.43 32.63L38.67 28.28L38.90 28.28L41.11 32.63Z"/>
     <mask id="nkern" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><use href="#n" fill="#fff" stroke="#000" stroke-width="2" stroke-linejoin="miter"/></mask>
     <mask id="nform" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><use href="#n" fill="#fff" stroke="#fff" stroke-width="3" stroke-linejoin="miter"/><use href="#nf" fill="#fff" stroke="#fff" stroke-width="3"/></mask>
     <filter id="nschatten" filterUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><feGaussianBlur stdDeviation="1.3"/></filter>
   </defs>
-  <!-- Gehäuse: dunkle Kante, blauer Metallrand, dunkles Feld -->
-  <rect x="7" y="7" width="86" height="86" rx="20" fill="#0b0c0e"/>
-  <rect x="9" y="9" width="82" height="82" rx="18.5" fill="url(#rand)"/>
-  <rect x="13" y="13" width="74" height="74" rx="15" fill="url(#feld)"/>
-  <rect x="13" y="13" width="74" height="74" rx="15" fill="url(#licht)"/>
-  <!-- Verbindungen: vom n über den Knoten zu den Geräten -->
+  <!-- Leuchten hinter dem Knoten -->
+  <circle cx="50" cy="40" r="22" fill="url(#halo)"/>
+  <!-- Leitungen: alle laufen im n zusammen -->
   <g stroke="#4fd0ff" stroke-width="2.6" stroke-linecap="round" fill="none" opacity=".9">
-    <path d="M50 42.4V52M50 52L30 64M50 52L50 66M50 52L70 64"/>
+    <path d="M50 40L30 64M50 40L50 66M50 40L70 64M50 40L25.5 24.5M50 40L74.5 24.5"/>
   </g>
-  <circle cx="50" cy="52" r="4.2" fill="url(#led)" filter="url(#glow)"/>
-  <!-- n in Dream MMA: Schatten, dunkler Rand, blaue Seele, Glanz -->
+  <!-- Netz-Knoten oben -->
+  <circle cx="25" cy="24" r="3.6" fill="#1a1b1f" stroke="#9aa0a8" stroke-width="1.4"/>
+  <circle cx="25" cy="24" r="1.6" fill="url(#led)" filter="url(#glow)"/>
+  <circle cx="75" cy="24" r="3.6" fill="#1a1b1f" stroke="#9aa0a8" stroke-width="1.4"/>
+  <circle cx="75" cy="24" r="1.6" fill="url(#led)" filter="url(#glow)"/>
+  <!-- n in Dream MMA als Knoten: Schatten, dunkler Rand, blaue Seele, Glanz -->
   <use href="#n" fill="#000" stroke="#000" stroke-width="3" stroke-linejoin="round" opacity=".6" transform="translate(1.2 2.4)" filter="url(#nschatten)"/>
   <use href="#n" fill="url(#anthrazit)" stroke="url(#anthrazit)" stroke-width="3" stroke-linejoin="miter"/>
   <use href="#nf" fill="url(#anthrazit)" stroke="url(#anthrazit)" stroke-width="3" stroke-linejoin="miter"/>
   <g mask="url(#nkern)"><use href="#n" fill="#00508f"/><use href="#n" fill="url(#seele)" transform="translate(0 .4)"/></g>
-  <g mask="url(#nform)"><ellipse cx="48" cy="-10" rx="40" ry="38" transform="rotate(-8 48 -10)" fill="url(#nspiegel)"/></g>
+  <g mask="url(#nform)"><ellipse cx="48" cy="2.3" rx="40" ry="38" transform="rotate(-8 48 2.3)" fill="url(#nspiegel)"/></g>
 
   <!-- Geräte unten -->
-  <g fill="#1a1b1f" stroke="#c9ccd2" stroke-width="1.5">
+  <g fill="#1a1b1f" stroke="#9aa0a8" stroke-width="1.5">
     <rect x="20" y="63" width="20" height="13" rx="2.5"/>
     <rect x="42" y="66" width="16" height="12" rx="2.5"/>
     <rect x="60" y="63" width="20" height="13" rx="2.5"/>

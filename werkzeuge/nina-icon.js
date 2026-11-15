@@ -86,6 +86,54 @@ ${GERAETE}
   fs.writeFileSync(out + '/icon-a.svg', svg);
 }
 
+// ---------- C: n als zentraler Knoten, alle Leitungen laufen hinein ----------
+{
+  const B = 36, k = B / 107.5, h = 70 * k, x0 = 50 - B / 2 + 0.1 * k, y0 = 40 + h / 2;   // n mittig bei y≈40
+  const n = transform(N, x0, y0, k);
+  const nf = 'M' + NF.map(([a, c]) => (x0 + a * k).toFixed(2) + ' ' + (y0 + c * k).toFixed(2)).join('L') + 'Z';
+  const svg = `${kopf('NINA')}
+  <defs>${DEFS}
+    <linearGradient id="anthrazit" x1="0" y1="0" x2="0" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#555962"/><stop offset="1" stop-color="#25272c"/>
+    </linearGradient>
+    <linearGradient id="seele" x1="0" y1="${(y0 - h).toFixed(0)}" x2="0" y2="${y0.toFixed(0)}" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#b8f0ff"/><stop offset=".45" stop-color="#4fd0ff"/><stop offset="1" stop-color="#0d8ee0"/>
+    </linearGradient>
+    <linearGradient id="nspiegel" x1="0" y1="${(y0 - h).toFixed(0)}" x2="0" y2="${(y0 - h / 2).toFixed(0)}" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff" stop-opacity=".6"/><stop offset="1" stop-color="#fff" stop-opacity=".1"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="50" cy="40" r="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4fd0ff" stop-opacity=".55"/><stop offset=".55" stop-color="#4fd0ff" stop-opacity=".15"/><stop offset="1" stop-color="#4fd0ff" stop-opacity="0"/>
+    </radialGradient>
+    <path id="n" d="${n}"/>
+    <path id="nf" d="${nf}"/>
+    <mask id="nkern" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><use href="#n" fill="#fff" stroke="#000" stroke-width="2" stroke-linejoin="miter"/></mask>
+    <mask id="nform" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><use href="#n" fill="#fff" stroke="#fff" stroke-width="3" stroke-linejoin="miter"/><use href="#nf" fill="#fff" stroke="#fff" stroke-width="3"/></mask>
+    <filter id="nschatten" filterUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><feGaussianBlur stdDeviation="1.3"/></filter>
+  </defs>${RAHMEN}
+  <!-- Leuchten hinter dem Knoten -->
+  <circle cx="50" cy="40" r="22" fill="url(#halo)"/>
+  <!-- Leitungen: alle laufen im n zusammen -->
+  <g stroke="#4fd0ff" stroke-width="2.6" stroke-linecap="round" fill="none" opacity=".9">
+    <path d="M50 40L30 64M50 40L50 66M50 40L70 64M50 40L25.5 24.5M50 40L74.5 24.5"/>
+  </g>
+  <!-- Netz-Knoten oben -->
+  <circle cx="25" cy="24" r="3.6" fill="#1a1b1f" stroke="#c9ccd2" stroke-width="1.4"/>
+  <circle cx="25" cy="24" r="1.6" fill="url(#led)" filter="url(#glow)"/>
+  <circle cx="75" cy="24" r="3.6" fill="#1a1b1f" stroke="#c9ccd2" stroke-width="1.4"/>
+  <circle cx="75" cy="24" r="1.6" fill="url(#led)" filter="url(#glow)"/>
+  <!-- n in Dream MMA als Knoten: Schatten, dunkler Rand, blaue Seele, Glanz -->
+  <use href="#n" fill="#000" stroke="#000" stroke-width="3" stroke-linejoin="round" opacity=".6" transform="translate(1.2 2.4)" filter="url(#nschatten)"/>
+  <use href="#n" fill="url(#anthrazit)" stroke="url(#anthrazit)" stroke-width="3" stroke-linejoin="miter"/>
+  <use href="#nf" fill="url(#anthrazit)" stroke="url(#anthrazit)" stroke-width="3" stroke-linejoin="miter"/>
+  <g mask="url(#nkern)"><use href="#n" fill="#00508f"/><use href="#n" fill="url(#seele)" transform="translate(0 .4)"/></g>
+  <g mask="url(#nform)"><ellipse cx="48" cy="${(y0 - h - 26).toFixed(1)}" rx="40" ry="38" transform="rotate(-8 48 ${(y0 - h - 26).toFixed(1)})" fill="url(#nspiegel)"/></g>
+${GERAETE}
+</svg>
+`;
+  fs.writeFileSync(out + '/icon-c.svg', svg);
+}
+
 // ---------- B: wie das erste Icon (Router oben), blau ----------
 {
   const svg = `${kopf('NINA')}
@@ -107,3 +155,10 @@ ${GERAETE}
   fs.writeFileSync(out + '/icon-b.svg', svg);
 }
 console.log('ok');
+
+// ---------- D (eingesetzt): wie C, ohne Rahmen, Ausschnitt angepasst ----------
+{
+  let s = fs.readFileSync(out + '/icon-c.svg', 'utf8');
+  s = s.replace(/\n  <!-- Gehäuse:[\s\S]*?url\(#licht\)"\/>/, '').replace('viewBox="0 0 100 100"', 'viewBox="15 13 70 70"').replace(/stroke="#c9ccd2"/g, 'stroke="#9aa0a8"');
+  fs.writeFileSync(out + '/icon-d.svg', s);
+}
