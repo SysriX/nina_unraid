@@ -120,6 +120,7 @@ class Geraet(Basis):
     ha_import: Mapped[bool] = mapped_column(Boolean, default=True)      # an Home Assistant geben
     wol_aktiv: Mapped[bool] = mapped_column(Boolean, default=False)
     wol_methode: Mapped[str] = mapped_column(String(16), default="")    # leer = wie Netzwerk
+    wol_mac: Mapped[str] = mapped_column(String(17), default="")        # leer = MAC der primären Schnittstelle (ab Schema 3)
     online: Mapped[bool] = mapped_column(Boolean, default=False)
     zuletzt_online: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     erstellt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=jetzt)
@@ -259,3 +260,31 @@ class Modell(Basis):
     typ_id: Mapped[int | None] = mapped_column(ForeignKey("ni_typ.id", ondelete="SET NULL"), nullable=True)
     notizen: Mapped[str] = mapped_column(Text, default="")
     erstellt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=jetzt)
+
+
+# ------------------------------------------------------------------ ab Schema 3: Nicht zugewiesene Funde
+class Fund(Basis):
+    """Ein noch nicht zugewiesener Fund (Netzwerk-Scan, OPNsense, HASS.Agent, …).
+
+    Erst beim Zuweisen entsteht daraus ein Gerät (ni_geraet) mit Schnittstelle bzw. Agent-Verknüpfung;
+    der Fund wird dabei gelöscht. „Zuweisung aufheben“ macht aus einem Gerät wieder Funde.
+    """
+    __tablename__ = "ni_fund"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    schluessel: Mapped[str] = mapped_column(String(160), unique=True)   # mac:aa:bb… | ip:<netz>:<ip> | agent:<id> | geraet:<n>
+    name: Mapped[str] = mapped_column(String(128), default="")
+    hostname: Mapped[str] = mapped_column(String(255), default="")
+    ip: Mapped[str] = mapped_column(String(64), default="", index=True)
+    mac: Mapped[str] = mapped_column(String(17), default="", index=True)
+    mac_hersteller: Mapped[str] = mapped_column(String(128), default="")
+    hersteller: Mapped[str] = mapped_column(String(128), default="")
+    modell: Mapped[str] = mapped_column(String(128), default="")
+    typ: Mapped[str] = mapped_column(String(32), default="unbekannt")    # Vermutung
+    netzwerk_id: Mapped[int | None] = mapped_column(ForeignKey("ni_netzwerk.id", ondelete="SET NULL"), nullable=True)
+    agent_id: Mapped[int | None] = mapped_column(ForeignKey("ni_agent.id", ondelete="CASCADE"), nullable=True, index=True)
+    quellen: Mapped[list] = mapped_column(JSON, default=list)            # ["scan", "opnsense", "agent", "manuell"]
+    online: Mapped[bool] = mapped_column(Boolean, default=False)
+    ignoriert: Mapped[bool] = mapped_column(Boolean, default=False)
+    daten: Mapped[dict] = mapped_column(JSON, default=dict)               # z. B. {"vorher": {…}} nach „Zuweisung aufheben“
+    erstmals: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=jetzt)
+    zuletzt: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -9,7 +9,7 @@ So funktioniert ein Update des Containers:
   * Danach legt create_all() noch fehlende (neue) Tabellen an.
 
 Neuen Schritt hinzufügen (Beispiel Version 2):
-    AKTUELL = 2
+    AKTUELL = 3
     def _v2(c):
         spalte_neu(c, "ni_geraet", Column("garantie_bis", Date, nullable=True))
     SCHRITTE[2] = ("Garantie-Datum für Geräte", _v2)
@@ -28,7 +28,7 @@ from sqlalchemy.schema import CreateIndex
 import kern
 from modelle import Basis, Schema
 
-AKTUELL = 2
+AKTUELL = 3
 SCHRITTE: dict[int, tuple[str, Callable[[Connection], None]]] = {}
 
 
@@ -39,7 +39,8 @@ def spalte_neu(c: Connection, tabelle: str, spalte: Column) -> None:
     typ = spalte.type.compile(dialect=c.dialect)
     sql = f"ALTER TABLE {tabelle} ADD COLUMN {spalte.name} {typ}"
     if spalte.server_default is not None:
-        sql += f" DEFAULT {spalte.server_default.arg}"
+        arg = spalte.server_default.arg
+        sql += f" DEFAULT '{arg}'" if isinstance(arg, str) else f" DEFAULT {arg}"
     if not spalte.nullable and spalte.server_default is not None:
         sql += " NOT NULL"
     c.execute(text(sql))
@@ -88,6 +89,32 @@ def _v2(c: Connection) -> None:
 
 
 SCHRITTE[2] = ("Kataloge: Gerätetypen, Hersteller, Modelle", _v2)
+
+
+def _v3(c: Connection) -> None:
+    """Nicht zugewiesene Funde in eigener Tabelle: Geräte mit Status neu/ignoriert und Agenten ohne Gerät → ni_fund."""
+    from sqlalchemy.orm import Session
+    import funde
+    from modelle import Agent, Fund, Geraet
+    Fund.__table__.create(c, checkfirst=True)
+    from sqlalchemy import String
+    spalte_neu(c, "ni_geraet", Column("wol_mac", String(17), server_default="", nullable=False))
+    s = Session(bind=c)
+    for g in list(s.scalars(select(Geraet).where(Geraet.status.in_(("neu", "ignoriert"))))):
+        ignoriert = g.status == "ignoriert"
+        vorher_ids = {f.id for f in s.scalars(select(Fund))}
+        funde.geraet_aufheben(s, g)
+        for f in s.scalars(select(Fund)):
+            if f.id not in vorher_ids:
+                f.ignoriert = ignoriert
+                f.daten = {}          # war nie zugewiesen – keine „vorher“-Angaben
+    for a in s.scalars(select(Agent).where(Agent.geraet_id.is_(None))):
+        funde.agent_fund(s, a)
+    s.flush()
+    s.close()
+
+
+SCHRITTE[3] = ("Nicht zugewiesene Funde in eigener Tabelle (ni_fund), WoL-MAC je Gerät", _v3)
 
 
 # ------------------------------------------------------------------ Ablauf

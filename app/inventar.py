@@ -13,7 +13,7 @@ import netz
 import opnsense
 from kern import iso, jetzt, protokoll, sitzung
 import katalog
-from modelle import Agent, Ereignis, Geraet, GeraetTyp, Netzwerk, Schnittstelle, Typ
+from modelle import Agent, Ereignis, Fund, Geraet, GeraetTyp, Netzwerk, Schnittstelle, Typ
 from zugang import ADMIN, LESER, OPERATOR, client_ip
 
 router = APIRouter(prefix="/api")
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/api")
 def typnamen(s) -> dict[str, str]:
     return {t.schluessel: t.name for t in s.scalars(select(Typ))}
 
-STATUS = ("aktiv", "neu", "ignoriert", "ausgemustert")
+STATUS = ("aktiv", "ausgemustert")     # Nicht zugewiesenes steht in ni_fund
 
 STANDARD_ALLGEMEIN = {"name": "NINA", "neue_geraete": "pruefen", "ueberwachen_intervall": 60,
                       "wol_port": 9, "agent_geraete_anlegen": True, "ereignisse_tage": 90, "zusatzfelder": []}
@@ -122,6 +122,7 @@ def einspielen(hosts: list[dict], quelle: str, netzwerk_id: int | None = None, o
     with sitzung() as s:
         netze = list(s.scalars(select(Netzwerk)))
         gesehen: set[int] = set()
+        fund_ids: set[int] = set()
         for h in hosts:
             ip, mac = (h.get("ip") or "").strip(), netz.mac_norm(h.get("mac"))
             if not ip and not mac:
@@ -155,28 +156,23 @@ def einspielen(hosts: list[dict], quelle: str, netzwerk_id: int | None = None, o
                 gesehen.add(sch.id)
                 betroffen.add(sch.geraet_id)
                 continue
-            if modus == "nein" or not h.get("online", True):
-                continue
-            hersteller = h.get("hersteller") or netz.mac_hersteller(mac)
-            g = Geraet(name=kurzname(hn) or ip or mac, typ=katalog.gueltiger_typ(s, typ_raten(hersteller, hn, mac)),
-                       hersteller="" if "zufällig" in hersteller else hersteller.split(" ")[0][:128],
-                       status="neu", quelle=quelle, online=True, zuletzt_online=jetzt())
-            s.add(g)
-            s.flush()
-            katalog.geraet_typen_setzen(s, g, [])
-            sch = Schnittstelle(geraet_id=g.id, mac=mac, ip=ip, hostname=hn, mac_hersteller=hersteller,
-                                netzwerk_id=nw.id if nw else None, primaer=True, quelle=quelle, online=True, zuletzt=jetzt())
-            s.add(sch)
-            s.flush()
-            gesehen.add(sch.id)
-            ereignis(s, g.id, "neu", f"gefunden per {quelle}: {ip} {mac}".strip())
-            neu += 1
+            import funde
+            f = funde.aus_host(s, h, quelle, nw, modus)    # kein Gerät → Fund unter „Nicht zugewiesen“
+            if f is not None:
+                if f.id is None:
+                    neu += 1
+                s.flush()
+                fund_ids.add(f.id)
         if offline_markieren and netzwerk_id:
             for sch in s.scalars(select(Schnittstelle).where(Schnittstelle.netzwerk_id == netzwerk_id,
                                                              Schnittstelle.online.is_(True))):
                 if sch.id not in gesehen:
                     sch.online = False
                     betroffen.add(sch.geraet_id)
+            from modelle import Fund
+            for f in s.scalars(select(Fund).where(Fund.netzwerk_id == netzwerk_id, Fund.online.is_(True), Fund.agent_id.is_(None))):
+                if f.id not in fund_ids:
+                    f.online = False
         online_aktualisieren(s, betroffen)
     return {"gefunden": len(hosts), "neu": neu, "geaendert": geaendert}
 
@@ -280,8 +276,15 @@ def wol_ziel(s, g: Geraet) -> tuple[Schnittstelle | None, Netzwerk | None]:
     schs = list(s.scalars(select(Schnittstelle).where(Schnittstelle.geraet_id == g.id, Schnittstelle.mac != "")
                           .order_by(Schnittstelle.primaer.desc(), Schnittstelle.id)))
     if not schs:
+        if g.wol_mac:                  # nur WoL-MAC, keine Schnittstelle mit MAC: Netz über irgendeine IP des Geräts
+            x = s.scalars(select(Schnittstelle).where(Schnittstelle.geraet_id == g.id, Schnittstelle.ip != "")).first()
+            nw = (s.get(Netzwerk, x.netzwerk_id) if x and x.netzwerk_id else None) or \
+                (netzwerk_fuer_ip(list(s.scalars(select(Netzwerk))), x.ip) if x else None)
+            return Schnittstelle(mac=g.wol_mac, ip=x.ip if x else ""), nw
         return None, None
     sch = schs[0]
+    if g.wol_mac:                      # eigene WoL-MAC (z. B. Onboard-Karte ohne IP): Netz der passenden bzw. primären Schnittstelle
+        sch = next((x for x in schs if x.mac == g.wol_mac), sch)
     nw = s.get(Netzwerk, sch.netzwerk_id) if sch.netzwerk_id else None
     if not nw and sch.ip:
         nw = netzwerk_fuer_ip(list(s.scalars(select(Netzwerk))), sch.ip)
@@ -308,7 +311,7 @@ def wecken(gid: int, wer: str, ip: str = "") -> dict:
         if not sch:
             raise HTTPException(400, "Das Gerät hat keine MAC-Adresse – Wake-on-LAN geht nicht")
         methode = wol_methode(g, nw)
-        mac, name = sch.mac, g.name
+        mac, name = (g.wol_mac or sch.mac), g.name
         ziele = []
         if nw:
             ziele.append(nw.wol_broadcast or str(netz.netz(nw.cidr).broadcast_address))
@@ -317,12 +320,19 @@ def wecken(gid: int, wer: str, ip: str = "") -> dict:
         else:
             ziele.append("255.255.255.255")
         iface = nw.opnsense_interface if nw else ""
+        direkt = bool(nw and netz.direkt_erreichbar(nw.cidr))
     wege, fehler = [], []
     if methode in ("container", "beide"):
-        try:
-            wege += netz.magic_paket(mac, ziele, int(allgemein().get("wol_port") or 9))
+        port = int(allgemein().get("wol_port") or 9)
+        try:     # UDP an Broadcast (Port 9 und 7) + rohes Ethernet-Paket – je nach Netzwerkkarte reagiert eines davon
+            wege += netz.magic_paket(mac, ziele, port)
+            wege += netz.magic_paket(mac, ziele, 7 if port == 9 else 9)
         except Exception as e:  # noqa: BLE001
             fehler.append(f"Container: {e}")
+        try:
+            wege += netz.magic_ethernet(mac) if direkt else []
+        except Exception as e:  # noqa: BLE001
+            fehler.append(f"Ethernet: {e}")
     if methode in ("opnsense", "beide"):
         try:
             wege.append(opnsense.wecken(mac, iface))
@@ -330,7 +340,7 @@ def wecken(gid: int, wer: str, ip: str = "") -> dict:
             fehler.append(str(e))
     ok = bool(wege)
     with sitzung() as s:
-        ereignis(s, gid, "wol", f"Wake-on-LAN ({methode}) von {wer}: " + (", ".join(wege) or "; ".join(fehler)))
+        ereignis(s, gid, "wol", f"Wake-on-LAN ({methode}) an {mac} von {wer}: " + (", ".join(wege) or "; ".join(fehler)))
         g = s.get(Geraet, gid)
         if g and not g.ueberwachen:
             g.ueberwachen = True      # damit der Start schnell erkannt wird
@@ -365,15 +375,20 @@ def geraet_json(s, g: Geraet, detail: bool = False, netze: dict | None = None, a
          "quelle": g.quelle, "online": g.online, "zuletzt_online": iso(g.zuletzt_online), "tags": g.tags or [],
          "ip": p.ip if p else "", "mac": next((x.mac for x in schs if x.mac), ""), "hostname": p.hostname if p else "",
          "netzwerk": netze.get(p.netzwerk_id, "") if p else "", "anzahl_schnittstellen": len(schs),
-         "wol": bool(g.wol_aktiv and any(x.mac for x in schs)), "ueberwachen": g.ueberwachen, "ha_import": g.ha_import,
+         "wol": bool(g.wol_aktiv and (g.wol_mac or any(x.mac for x in schs))), "ueberwachen": g.ueberwachen, "ha_import": g.ha_import,
          "agent": {"id": ag.id, "name": ag.name, "online": ag.online} if ag else None, "quelle_scan": any(x.quelle != "manuell" for x in schs),
          "angemeldet": agent_mod.angemeldet(ag.id) if ag else "", "geaendert": iso(g.geaendert)}
     if detail:
         sch_nw = s.get(Netzwerk, p.netzwerk_id) if p and p.netzwerk_id else None
         _, wnw = wol_ziel(s, g)
-        d.update({"seriennummer": g.seriennummer, "inventarnummer": g.inventarnummer, "betriebssystem": g.betriebssystem,
+        wsch, _ = wol_ziel(s, g)
+        wmac = g.wol_mac or (wsch.mac if wsch else "")
+        whst = netz.mac_hersteller(wmac) or next((x.mac_hersteller for x in schs if x.mac == wmac), "")
+        d.update({"wol_mac": g.wol_mac, "wol_mac_wirksam": wmac, "wol_mac_hersteller": whst,
+                  "wol_warnung": bool(re.search(r"10gtek|82599|mellanox|chelsio|solarflare|x520|x540|aquantia|marvell", whst, re.I)),
+                  "seriennummer": g.seriennummer, "inventarnummer": g.inventarnummer, "betriebssystem": g.betriebssystem,
                   "notizen": g.notizen, "extra": g.extra or {}, "wol_aktiv": g.wol_aktiv, "wol_methode": g.wol_methode,
-                  "wol_methode_wirksam": wol_methode(g, wnw) if any(x.mac for x in schs) else "",
+                  "wol_methode_wirksam": wol_methode(g, wnw) if (g.wol_mac or any(x.mac for x in schs)) else "",
                   "wol_netz": wnw.name if wnw else "", "erstellt": iso(g.erstellt),
                   "schnittstellen": [_sch_json(x, netze) for x in schs],
                   "netzwerk_cidr": sch_nw.cidr if sch_nw else "",
@@ -410,10 +425,10 @@ def uebersicht(ich: dict = Depends(LESER)):
                       Schnittstelle.netzwerk_id == n.id, Schnittstelle.online.is_(True))) or 0}
                  for n in s.scalars(select(Netzwerk).order_by(Netzwerk.name))]
         return {"geraete": zahl(Geraet.status == "aktiv"), "online": zahl(Geraet.status == "aktiv", Geraet.online.is_(True)),
-                "neu": zahl(Geraet.status == "neu"), "ignoriert": zahl(Geraet.status == "ignoriert"),
+                "neu": s.scalar(select(func.count(Fund.id)).where(Fund.ignoriert.is_(False))) or 0, "ignoriert": 0,
                 "agenten": s.scalar(select(func.count(Agent.id))) or 0,
                 "agenten_online": s.scalar(select(func.count(Agent.id)).where(Agent.online.is_(True))) or 0,
-                "agenten_frei": s.scalar(select(func.count(Agent.id)).where(Agent.geraet_id.is_(None))) or 0,
+                "agenten_frei": 0,
                 "typen": [{"typ": k, "name": tn.get(k, k), "anzahl": v} for k, v in sorted(typen.items(), key=lambda x: -x[1])],
                 "netze": netze,
                 "ereignisse": [{"zeit": iso(e.zeit), "art": e.art, "text": e.text, "geraet_id": e.geraet_id, "geraet": n or ""} for e, n in ev]}
@@ -447,7 +462,7 @@ def geraet(gid: int, ich: dict = Depends(LESER)):
 
 
 FELDER = ("name", "typ", "hersteller", "modell", "seriennummer", "inventarnummer", "betriebssystem", "standort", "raum",
-          "benutzer", "notizen", "status", "wol_methode")
+          "benutzer", "notizen", "status", "wol_methode", "wol_mac")
 BOOL_FELDER = ("ueberwachen", "ha_import", "wol_aktiv")
 
 
@@ -471,6 +486,10 @@ async def geraet_speichern(req: Request, ich: dict = Depends(OPERATOR)):
             s.add(g)
         if d.get("typ") and not s.scalar(select(Typ.id).where(Typ.schluessel == d["typ"])):
             raise HTTPException(400, "Unbekannter Typ")
+        if d.get("wol_mac"):
+            d["wol_mac"] = netz.mac_norm(d["wol_mac"])
+            if not d["wol_mac"]:
+                raise HTTPException(400, "WoL-MAC ungültig – Schreibweise z. B. aa:bb:cc:dd:ee:ff")
         for f in FELDER:
             if f in d and d[f] is not None:
                 setattr(g, f, str(d[f]).strip())

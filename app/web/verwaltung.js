@@ -123,7 +123,7 @@ function allgemeinTab(a) {
       feld("Überwachte Geräte anpingen alle … s", eingabe("ueberwachen_intervall", a.ueberwachen_intervall, { type: "number", min: 15 })),
       feld("WoL-Port", auswahl("wol_port", [["9", "9 (Standard)"], ["7", "7"]], a.wol_port)),
       feld("Ereignisse aufheben (Tage)", eingabe("ereignisse_tage", a.ereignisse_tage, { type: "number", min: 7 }))),
-    haken("Für neue HASS.Agents gleich einen Fund anlegen", a.agent_geraete_anlegen, "Sonst steht der Agent ohne Gerät unter „Nicht zugewiesen“ (Übernehmen legt es dann an); mit gleichnamigem Inventar-Gerät wird immer verknüpft", "agent_geraete_anlegen").el);
+    h("p", { class: "leise klein-t" }, "HASS.Agents werden nie automatisch zugewiesen – neue stehen immer unter Inventar › Nicht zugewiesen."));
   return h("div", {}, h("div", { class: "karte" }, h("h2", {}, "Allgemein"), f),
     h("div", { class: "karte" }, h("h2", {}, "Zusatzfelder für Geräte"), h("p", { class: "leise klein-t" }, "Eigene Angaben je Gerät (z. B. Garantie bis, Kostenstelle, Lieferant) – ohne Datenbank-Umbau, gespeichert im Feld „extra“ und auch an Home Assistant übergeben."), zf),
     h("div", { class: "leiste" }, h("span", { class: "rechts" }, h("button", { class: "p", onclick: async () => {
@@ -190,6 +190,16 @@ function sicherungTab(s) {
           const b = await r.blob(); const a = h("a", { href: URL.createObjectURL(b), download: (r.headers.get("content-disposition") || "").split('"')[1] || "nina.json" });
           document.body.append(a); a.click(); a.remove();
         } }, "Sicherung herunterladen")),
+      darf("admin") ? [h("h4", {}, "Neustart der Zuweisung"),
+        h("p", { class: "leise klein-t" }, "Löst alle Geräte auf: ihre Schnittstellen und HASS.Agents stehen danach wieder unter „Nicht zugewiesen“ (Name, Typ, Hersteller usw. bleiben dort vorgemerkt und füllen beim erneuten Zuweisen das Formular). Vorher wird gesichert (SQLite: Kopie der Datei, MariaDB: JSON in /config)."),
+        h("button", { class: "gefahr", onclick: async () => {
+          const e = eingabe("", "", { placeholder: "NEUSTART" });
+          const ok = await dialog("Alle Zuweisungen aufheben", h("div", {}, h("p", {}, "Alle Geräte werden wieder zu nicht zugewiesenen Funden. Zur Bestätigung NEUSTART eintippen:"), e),
+            [["Abbrechen", null], ["Aufheben", () => e.value.trim() === "NEUSTART" || (hinweis("Bitte NEUSTART eintippen", true), false), "p gefahr"]]);
+          if (!ok) return;
+          const r = await versuch(() => api("POST", "/api/zuweisungen/aufheben", { bestaetigung: "NEUSTART" }));
+          hinweis(`${r.geraete} Geräte aufgelöst → ${r.funde} Funde. Sicherung: ${r.sicherung}`); location.hash = "#neu";
+        } }, "Alle Zuweisungen aufheben …")] : null,
       h("h4", {}, "Wiederherstellen"), h("div", { class: "leiste" }, datei, h("button", { class: "gefahr", onclick: async () => {
         if (!datei.files[0]) return hinweis("Erst eine Datei wählen", true);
         let d; try { d = JSON.parse(await datei.files[0].text()); } catch { return hinweis("Keine gültige JSON-Datei", true); }

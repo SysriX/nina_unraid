@@ -81,7 +81,7 @@ ANSICHT.geraete = { titel: "Geräte", async zeigen(main, q) {
     auswahl("", [["", "Alle Typen"], ...META.typen], FILTER.typ, { onchange: e => { FILTER.typ = e.target.value; zeichnen(); } }),
     auswahl("", [["", "Alle Netze"], ...netze], FILTER.netz, { onchange: e => { FILTER.netz = e.target.value; zeichnen(); } }),
     auswahl("", [["", "Online + offline"], ["online", "Nur online"], ["offline", "Nur offline"]], FILTER.online, { onchange: e => { FILTER.online = e.target.value; zeichnen(); } }),
-    auswahl("", [["aktiv", "Inventar"], ["ignoriert", "Ignorierte"], ["ausgemustert", "Ausgemustert"], ["alle", "Alle"]], FILTER.status, { onchange: e => { FILTER.status = e.target.value; laden(); } }),
+    auswahl("", [["aktiv", "Inventar"], ["ausgemustert", "Ausgemustert"], ["alle", "Alle"]], FILTER.status, { onchange: e => { FILTER.status = e.target.value; laden(); } }),
     h("span", { class: "rechts" }, darf("operator") ? h("button", { class: "p", onclick: () => geraetDialog() }, "Gerät hinzufügen") : null)),
     box);
   suche.focus();
@@ -109,7 +109,7 @@ async function geraetDialog(g = null) {
       feld("Standort", eingabe("standort", g.standort, { placeholder: "z. B. Büro, Keller-Rack" })),
       feld("Raum-Kürzel (Home Assistant)", eingabe("raum", g.raum, { placeholder: "bu, wz, … leer = haus" }), "Vorne in der Entitäts-ID: <raum>_net_<gerät>_…"),
       feld("Schlagwörter", eingabe("tags", (g.tags || []).join(", "), { placeholder: "kommagetrennt" })),
-      neu ? null : feld("Status", auswahl("status", [["aktiv", "Im Inventar"], ["neu", "Neu (ungeprüft)"], ["ignoriert", "Ignoriert"], ["ausgemustert", "Ausgemustert"]], g.status))),
+      neu ? null : feld("Status", auswahl("status", [["aktiv", "Im Inventar"], ["ausgemustert", "Ausgemustert"]], g.status))),
     th.el,
     neu ? h("div", { class: "raster" }, feld("IP-Adresse", eingabe("ip", "", { placeholder: "192.168.10.20" })), feld("MAC-Adresse", eingabe("mac", "", { placeholder: "aa:bb:cc:dd:ee:ff" })),
       h("div", {}, haken("Feste IP (Scan ändert sie nicht)", false, null, "feste_ip").el)) : null,
@@ -123,6 +123,9 @@ async function geraetDialog(g = null) {
     h("div", { class: "raster" },
       haken("Wake-on-LAN erlauben", g.wol_aktiv, "Braucht eine MAC-Adresse", "wol_aktiv").el,
       feld("WoL-Weg", auswahl("wol_methode", [["", "Wie das Netzwerk"], ...WOL_METHODEN], g.wol_methode)),
+      feld("WoL-MAC", h("div", {}, eingabe("wol_mac", g.wol_mac || "", { list: "wolmacs", placeholder: "leer = MAC der primären Schnittstelle" }),
+        h("datalist", { id: "wolmacs" }, (g.schnittstellen || []).filter(x => x.mac).map(x => h("option", { value: x.mac }, [x.name, x.mac_hersteller].filter(Boolean).join(" · "))))),
+        "z. B. die Onboard-Karte, wenn das Gerät über eine 10-Gbit-Karte im Netz hängt (Windows: ipconfig /all)"),
       haken("Überwachen (regelmäßig anpingen)", g.ueberwachen, "Schnelle Online-Erkennung, z. B. für PCs", "ueberwachen").el,
       haken("An Home Assistant geben", g.ha_import, "Gerät mit Sensoren/Knöpfen in HA anlegen", "ha_import").el));
   const r = await dialog(neu ? "Gerät hinzufügen" : `„${g.name}“ bearbeiten`, f, [["Abbrechen", null], ["Speichern", async () => {
@@ -145,7 +148,11 @@ ANSICHT.geraet = { titel: "Gerät", async zeigen(main, q) {
     const links = h("div", {},
       h("div", { class: "karte" },
         h("h2", {}, typSymbol(g.typ), g.name, g.status !== "aktiv" ? marke(g.status, "warn") : null,
-          h("span", { class: "rechts" }, darf("operator") ? h("button", { class: "klein", onclick: () => geraetDialog(g) }, "Bearbeiten") : null)),
+          h("span", { class: "rechts" }, darf("operator") ? h("button", { class: "klein", onclick: () => geraetDialog(g) }, "Bearbeiten") : null,
+            darf("admin") ? h("button", { class: "klein gefahr", title: "Gerät auflösen: Schnittstellen und Agent kommen wieder unter „Nicht zugewiesen“", onclick: async () => {
+              if (!(await bestaetigen(`Zuweisung von „${g.name}“ aufheben? Das Gerät verschwindet aus dem Inventar; seine Schnittstellen und der HASS.Agent stehen wieder unter „Nicht zugewiesen“ (die Angaben werden dort vorgemerkt).`, "Aufheben"))) return;
+              const r = await versuch(() => api("POST", `/api/geraete/${g.id}/aufheben`)); hinweis(`Aufgehoben – ${r.funde} Funde unter „Nicht zugewiesen“`); location.hash = "#neu";
+            } }, "Zuweisung aufheben") : null)),
         h("dl", { class: "daten" },
           [["Typ", (g.typ_namen || [g.typ_name]).join(", ")], ["Benutzer", g.benutzer], ["Angemeldet", g.angemeldet], ["Hersteller", g.hersteller], ["Modell", g.modell],
            ["Betriebssystem", g.betriebssystem], ["Seriennummer", g.seriennummer], ["Inventarnummer", g.inventarnummer],
@@ -175,8 +182,10 @@ function statusKarte(g, neu) {
       h("div", { class: "wert" }, h("div", { class: "l" }, "IP"), h("div", { class: "w mono" }, g.ip || "–")),
       h("div", { class: "wert" }, h("div", { class: "l" }, "MAC"), h("div", { class: "w mono" }, g.mac || "–"))),
     h("h2", { style: { marginTop: "16px" } }, "Wake-on-LAN"),
-    g.mac ? h("div", {},
+    g.mac || g.wol_mac ? h("div", {},
       h("p", { class: "leise klein-t" }, g.wol_aktiv ? `Weg: ${(WOL_METHODEN.find(x => x[0] === g.wol_methode_wirksam) || [, g.wol_methode_wirksam])[1]}` + (g.wol_netz ? ` · Netz ${g.wol_netz}` : "") : "Wake-on-LAN ist für dieses Gerät aus (Bearbeiten › Wake-on-LAN erlauben)."),
+      g.wol_aktiv ? h("p", { class: "klein-t", style: { marginTop: "-4px" } }, "an ", h("b", { class: "mono" }, g.wol_mac_wirksam), g.wol_mac_hersteller ? h("span", { class: "leise" }, ` (${g.wol_mac_hersteller})`) : null, g.wol_mac ? marke("eigene WoL-MAC", "akz") : null) : null,
+      g.wol_aktiv && g.wol_warnung ? h("p", { class: "klein-t", style: { color: "var(--warn)" } }, "Diese Netzwerkkarte (10 Gbit/SFP+) kann Wake-on-LAN meist nicht. Unter Bearbeiten › WoL-MAC die MAC der Onboard-Karte eintragen (Kabel muss stecken, WoL im BIOS an).") : null,
       g.wol_aktiv && darf("operator") ? h("button", { class: "p", onclick: () => wecken(g).then(neu) }, g.online ? "Trotzdem wecken" : "Einschalten (WoL)") : null)
       : h("p", { class: "leise" }, "Keine MAC-Adresse bekannt."));
 }
@@ -240,103 +249,97 @@ async function schnittstelleDialog(g, x = null) {
   if (await dialog(x ? "Schnittstelle bearbeiten" : "Schnittstelle hinzufügen", f, kn)) zeige();
 }
 
-// ------------------------------------------------------------------ Nicht zugewiesen
+// ------------------------------------------------------------------ Nicht zugewiesen (Tabelle ni_fund)
 const QUELLE_NAMEN = { scan: "Netzwerk-Scan", opnsense: "OPNsense", agent: "HASS.Agent", manuell: "von Hand" };
 let QUELLE_FILTER = "";
+const quellenMarken = qs => (qs || []).map(q => marke(QUELLE_NAMEN[q] || q, q === "agent" ? "akz" : ""));
+
 ANSICHT.neu = { titel: "Nicht zugewiesen", async zeigen(main) {
   const laden = async () => {
-    const [n, a, akt] = await Promise.all([api("GET", "/api/geraete?status=neu"), api("GET", "/api/agenten"), api("GET", "/api/geraete?status=aktiv")]);
-    // Geräte-Funde (Scan, OPNsense, Agent mit eigenem Fund) + Agenten ganz ohne Gerät
-    const zeilen = [
-      ...n.geraete.map(g => ({ art: "geraet", g, quelle: g.agent ? "agent" : (g.quelle || "scan") })),
-      ...a.agenten.filter(x => !x.geraet_id).map(x => ({ art: "agent", a: x, quelle: "agent" })),
-    ];
-    ZAHLEN.neu = zeilen.length;
-    const anzahl = q => zeilen.filter(z => z.quelle === q).length;
-    const liste = zeilen.filter(z => !QUELLE_FILTER || z.quelle === QUELLE_FILTER);
-    const uebernehmen = async z => {
-      let g = z.g;
-      if (z.art === "agent") {      // Agent ohne Gerät: erst einen Fund anlegen, dann wie gewohnt übernehmen
-        await versuch(() => api("POST", `/api/agenten/${z.a.id}/verknuepfen`, { neu: true }));
-        const frisch = await api("GET", "/api/agenten");
-        const gid = (frisch.agenten.find(x => x.id === z.a.id) || {}).geraet_id;
-        if (!gid) return;
-        g = await api("GET", `/api/geraete/${gid}`);
-      }
-      if (await uebernehmenDialog(g)) laden(); else laden();
-    };
+    const ign = QUELLE_FILTER === "ignoriert";
+    const [d, akt] = await Promise.all([api("GET", `/api/funde?ignoriert=${ign ? 1 : 0}`), api("GET", "/api/geraete?status=aktiv")]);
+    const alle_ = d.funde;
+    if (!ign) ZAHLEN.neu = alle_.length;
+    const anzahl = q => alle_.filter(f => f.quellen.includes(q)).length;
+    const liste = ign || !QUELLE_FILTER ? alle_ : alle_.filter(f => f.quellen.includes(QUELLE_FILTER));
     leeren(main,
-      h("p", { class: "leise" }, "Alles, was Netzwerk-Scan, OPNsense oder ein HASS.Agent gefunden hat und noch nicht im Inventar ist. Ins Inventar kommt ein Fund nur über „Übernehmen“ – dabei lassen sich doppelte Funde (z. B. Scan + Agent desselben PCs) gleich zusammenführen. Ignorierte tauchen nicht wieder auf."),
-      h("div", { class: "leiste" }, h("div", { class: "tabs" }, [["", `Alle (${zeilen.length})`], ["scan", `Netzwerk-Scan (${anzahl("scan")})`],
-        ["opnsense", `OPNsense (${anzahl("opnsense")})`], ["agent", `HASS.Agent (${anzahl("agent")})`]].map(([k, t]) =>
+      h("p", { class: "leise" }, "Alles, was Netzwerk-Scan, OPNsense oder ein HASS.Agent gefunden hat, steht hier – auch wenn mehrere Quellen dasselbe Gerät melden. Ins Inventar (Geräte) kommt ein Fund nur über „Zuweisen“; dabei lassen sich mehrere Funde zu einem Gerät zusammenführen."),
+      h("div", { class: "leiste" }, h("div", { class: "tabs" }, [["", `Alle (${ign ? "…" : alle_.length})`], ["scan", `Netzwerk-Scan (${ign ? "…" : anzahl("scan")})`],
+        ["opnsense", `OPNsense (${ign ? "…" : anzahl("opnsense")})`], ["agent", `HASS.Agent (${ign ? "…" : anzahl("agent")})`], ["ignoriert", "Ignoriert"]].map(([k, t]) =>
         h("button", { class: k === QUELLE_FILTER ? "an" : "", onclick: () => { QUELLE_FILTER = k; laden(); } }, t))),
         h("span", { class: "rechts" }, h("a", { href: "#einstellungen?tab=zeitplan" }, h("button", { class: "klein" }, "Zeitplan der Suche")))),
-      h("div", { class: "karte" }, h("h2", {}, `${liste.length} nicht zugewiesen`, liste.some(z => z.art === "geraet") && darf("operator") ? h("span", { class: "rechts" },
-        h("button", { class: "klein", onclick: async () => { const gs = liste.filter(z => z.art === "geraet"); if (!(await bestaetigen(`Alle ${gs.length} angezeigten Funde ignorieren?`, "Ignorieren"))) return;
-          for (const z of gs) await api("POST", `/api/geraete/${z.g.id}/status`, { status: "ignoriert" }); laden(); } }, "Alle ignorieren")) : null),
+      h("div", { class: "karte" }, h("h2", {}, ign ? `${liste.length} ignoriert` : `${liste.length} nicht zugewiesen`,
+        !ign && liste.length && darf("operator") ? h("span", { class: "rechts" }, h("button", { class: "klein", onclick: async () => {
+          if (!(await bestaetigen(`Alle ${liste.length} angezeigten Funde ignorieren?`, "Ignorieren"))) return;
+          for (const f of liste) await api("POST", `/api/funde/${f.id}/ignorieren`, { an: true }); laden(); } }, "Alle ignorieren")) : null),
         tabelle([
-          { t: "", w: z => punkt((z.g || z.a).online ? "ok" : "") },
-          { t: "Name", w: z => h("div", { class: "zwei-zeilen" }, h("b", {}, z.art === "agent" ? z.a.name : z.g.name),
-              z.art === "agent" ? h("small", {}, `HASS.Agent ${z.a.version || ""} · ${z.a.modell || ""}`) : z.g.hostname && z.g.hostname.split(".")[0].toLowerCase() !== z.g.name.toLowerCase() ? h("small", {}, z.g.hostname) : null) },
-          { t: "Vermutung", w: z => z.art === "agent" ? h("span", {}, typSymbol("pc"), " ", typName("pc")) : h("span", {}, typSymbol(z.g.typ), " ", z.g.typ_name) },
-          { t: "IP", w: z => z.g ? h("span", { class: "mono" }, z.g.ip) : "" }, { t: "MAC", w: z => z.g ? h("span", { class: "mono" }, z.g.mac) : "" },
-          { t: "Hersteller", w: z => z.g ? z.g.hersteller : "" }, { t: "Netz", w: z => z.g ? z.g.netzwerk : "" },
-          { t: "Quelle", w: z => marke(QUELLE_NAMEN[z.quelle] || z.quelle, z.quelle === "agent" ? "akz" : "") },
-          { t: "Gefunden", w: z => vorZeit(z.g ? z.g.geaendert : z.a.erstellt) },
-          { t: "", w: z => darf("operator") ? h("div", { class: "knopfreihe" },
-            h("button", { class: "klein p", onclick: () => uebernehmen(z) }, "Übernehmen"),
-            z.g ? h("button", { class: "klein", onclick: () => zusammenDialog(z.g, akt.geraete).then(r => r && laden()) }, "Zu Gerät hinzufügen") : null,
-            z.g ? h("button", { class: "klein", onclick: async () => { await api("POST", `/api/geraete/${z.g.id}/status`, { status: "ignoriert" }); laden(); } }, "Ignorieren")
-              : darf("admin") ? h("button", { class: "klein gefahr", onclick: async () => { if (await bestaetigen(`Agent „${z.a.name}“ entfernen? Meldet er sich wieder, taucht er hier neu auf.`, "Entfernen")) { await api("DELETE", `/api/agenten/${z.a.id}`); laden(); } } }, "Entfernen") : null) : null },
-        ], liste, { leer: zeilen.length ? "Für diese Quelle gibt es nichts Neues." : "Nichts Neues – alles im Inventar.",
-          klick: z => z.g && (location.hash = `#geraet?id=${z.g.id}`) })));
+          { t: "", w: f => punkt(f.online ? "ok" : "") },
+          { t: "Name", w: f => h("div", { class: "zwei-zeilen" }, h("b", {}, f.name || f.ip || f.mac),
+              f.agent ? h("small", {}, `HASS.Agent ${f.agent.name} ${f.agent.version || ""}`) : f.hostname && f.hostname.split(".")[0].toLowerCase() !== (f.name || "").toLowerCase() ? h("small", {}, f.hostname) : null,
+              f.vorher ? h("small", {}, "früher zugewiesen") : null), sort: f => (f.name || "").toLowerCase() },
+          { t: "Vermutung", w: f => h("span", {}, typSymbol(f.typ), " ", f.typ_name) },
+          { t: "IP", w: f => h("span", { class: "mono" }, f.ip), sort: f => (f.ip || "").split(".").map(x => x.padStart(3, "0")).join(".") },
+          { t: "MAC", w: f => h("span", { class: "mono" }, f.mac) },
+          { t: "Hersteller", w: f => f.hersteller || f.mac_hersteller }, { t: "Netz", w: f => f.netzwerk },
+          { t: "Erkannt durch", w: f => h("span", { class: "chips" }, quellenMarken(f.quellen)) },
+          { t: "Zuletzt", w: f => f.online ? "jetzt" : vorZeit(f.zuletzt), sort: f => f.zuletzt || "" },
+          { t: "", w: f => darf("operator") ? h("div", { class: "knopfreihe" },
+            ign ? h("button", { class: "klein", onclick: async () => { await api("POST", `/api/funde/${f.id}/ignorieren`, { an: false }); laden(); } }, "Wieder anzeigen") : [
+              h("button", { class: "klein p", onclick: () => zuweisenDialog(f).then(() => laden()) }, "Zuweisen"),
+              h("button", { class: "klein", onclick: () => zuGeraetDialog(f, akt.geraete).then(r => r && laden()) }, "Zu Gerät hinzufügen"),
+              h("button", { class: "klein", onclick: async () => { await api("POST", `/api/funde/${f.id}/ignorieren`, { an: true }); laden(); } }, "Ignorieren")]) : null },
+        ], liste, { leer: ign ? "Nichts ignoriert." : alle_.length ? "Für diese Quelle gibt es nichts." : "Nichts offen – alles zugewiesen.", sortierbar: true })));
   };
   await laden();
   alle(30, laden);
 } };
 
-/** Gerät ins Inventar übernehmen – dabei andere Funde (Scan, Agent, OPNsense) direkt zusammenführen. */
-async function uebernehmenDialog(g) {
-  const [v, kat] = await Promise.all([api("GET", `/api/geraete/${g.id}/vorschlaege`), katalogLaden(true)]);
-  const wahl = new Set(v.vorschlaege.filter(x => x.status === "neu" && x.gruende.length).map(x => x.id));
-  let ziel = null;     // gewähltes Inventar-Gerät, in das stattdessen alles einfließt
-  const th = typHerstellerFelder(g, kat);
-  const kopf = h("div", { class: "raster" }, feld("Name", eingabe("name", g.name)),
-    feld("Benutzer", eingabe("benutzer", g.benutzer || "")), feld("Raum-Kürzel", eingabe("raum", g.raum || "", { placeholder: "optional" })),
-    feld("Standort", eingabe("standort", g.standort || "")));
-  const quelle = x => [x.agent_name ? "HASS.Agent" : "", x.quelle].filter(Boolean)[0] || x.quelle;
+/** Fund zuweisen: neues Gerät anlegen (oder in ein Inventar-Gerät) und weitere Funde gleich mit zusammenführen. */
+async function zuweisenDialog(f) {
+  const [v, kat] = await Promise.all([api("GET", `/api/funde/${f.id}/vorschlaege`), katalogLaden(true)]);
+  const vor = f.vorher || {};
+  const wahl = new Set(v.vorschlaege.filter(x => x.art === "fund" && x.gruende.length).map(x => x.id));
+  let ziel = null, formular = null;
+  const th = typHerstellerFelder({ typ: vor.typ || f.typ, typen: vor.typen || [f.typ], hersteller: vor.hersteller || f.hersteller, modell: vor.modell || f.modell }, kat);
+  const kopf = h("div", { class: "raster" },
+    feld("Name", eingabe("name", vor.name || (f.agent ? f.agent.name : f.name) || f.ip)),
+    feld("Benutzer", eingabe("benutzer", vor.benutzer || "")), feld("Raum-Kürzel", eingabe("raum", vor.raum || "", { placeholder: "optional" })),
+    feld("Standort", eingabe("standort", vor.standort || "")));
   const liste = h("div");
-  const zeichne = () => leeren(liste, v.vorschlaege.length ? tabelle([
-    { t: "", w: x => x.status === "neu"
-        ? h("input", { type: "checkbox", checked: wahl.has(x.id), disabled: !!ziel, onchange: e => { e.target.checked ? wahl.add(x.id) : wahl.delete(x.id); } })
-        : h("input", { type: "radio", name: "ziel", checked: ziel === x.id, title: "stattdessen in dieses Inventar-Gerät übernehmen",
+  const zeichne = () => { if (formular) formular.classList.toggle("versteckt", !!ziel); leeren(liste, v.vorschlaege.length ? tabelle([
+    { t: "", w: x => x.art === "fund"
+        ? h("input", { type: "checkbox", checked: wahl.has(x.id), onchange: e => { e.target.checked ? wahl.add(x.id) : wahl.delete(x.id); } })
+        : h("input", { type: "radio", name: "ziel", checked: ziel === x.id, title: "stattdessen diesem Gerät hinzufügen",
             onclick: e => { ziel = ziel === x.id ? null : x.id; e.target.checked = ziel === x.id; zeichne(); } }) },
-    { t: "Gerät", w: x => h("div", { class: "zwei-zeilen" }, h("b", {}, x.name), h("small", {}, x.status === "neu" ? "nicht zugewiesen · " + quelle(x) : "im Inventar")) },
+    { t: "", w: x => x.art === "fund" ? h("span", { class: "chips" }, quellenMarken(x.quellen)) : marke("im Inventar", "ok") },
+    { t: "Name", w: x => h("div", { class: "zwei-zeilen" }, h("b", {}, x.name || x.ip), x.agent ? h("small", {}, "Agent " + x.agent.name) : null) },
     { t: "Typ", w: x => h("span", {}, typSymbol(x.typ), " ", x.typ_name) },
     { t: "IP / MAC", w: x => h("div", { class: "zwei-zeilen mono" }, x.ip, h("small", {}, x.mac)) },
     { t: "Passt wegen", w: x => x.gruende.length ? x.gruende.map(r => marke(r, "ok")) : h("span", { class: "leise" }, "–") },
-  ], v.vorschlaege) : h("p", { class: "leise" }, "Keine weiteren Funde."));
+  ], v.vorschlaege) : h("p", { class: "leise" }, "Keine weiteren Funde.")); };
+  formular = h("div", {}, kopf, th.el);
   zeichne();
-  const f = h("div", {}, kopf, th.el,
-    h("h4", {}, "Zusammenführen"),
-    h("p", { class: "leise klein-t" }, "Haken: dieser Fund wird mit übernommen (Schnittstellen, HASS.Agent und Verlauf wandern in dieses Gerät, der Fund verschwindet). Vorausgewählt ist, was über Name, IP oder MAC passt. Kreis bei einem Inventar-Gerät: statt neu anzulegen, wird alles diesem Gerät zugeschlagen."),
+  const f_ = h("div", {},
+    h("div", { class: "leiste" }, h("span", {}, "Fund: "), h("b", {}, f.name || f.ip), h("span", { class: "chips" }, quellenMarken(f.quellen)),
+      h("span", { class: "mono leise" }, [f.ip, f.mac].filter(Boolean).join(" · "))),
+    formular,
+    h("h4", {}, "Weitere Funde zusammenführen"),
+    h("p", { class: "leise klein-t" }, "Haken: dieser Fund gehört zum selben Gerät (z. B. Scan + HASS.Agent desselben PCs) und wird mit zugewiesen. Vorausgewählt ist, was über Name, IP oder MAC passt. Kreis bei einem Inventar-Gerät: statt ein neues Gerät anzulegen, kommt alles zu diesem Gerät."),
     liste);
-  return dialog(`„${g.name}“ übernehmen`, f, [["Abbrechen", null], ["Übernehmen", async () => {
-    if (ziel) {
-      await versuch(() => api("POST", `/api/geraete/${g.id}/zusammenfuehren`, { ziel }));
-      for (const id of wahl) await api("POST", `/api/geraete/${id}/zusammenfuehren`, { ziel }).catch(() => {});
-      hinweis("Zum Inventar-Gerät hinzugefügt");
-      return true;
-    }
-    return versuch(() => api("POST", `/api/geraete/${g.id}/status`, { status: "aktiv", ...lesenForm(kopf), ...th.werte(), zusammen: [...wahl] }),
-      wahl.size ? `Übernommen, ${wahl.size} zusammengeführt` : "Übernommen");
+  return dialog(`„${f.name || f.ip}“ zuweisen`, f_, [["Abbrechen", null], ["Zuweisen", async () => {
+    const daten = ziel ? { ziel, weitere: [...wahl] } : { ...lesenForm(kopf), ...th.werte(), weitere: [...wahl] };
+    const r = await versuch(() => api("POST", `/api/funde/${f.id}/zuweisen`, daten),
+      x => `${ziel ? "Hinzugefügt" : "Zugewiesen"} (${x.funde} ${x.funde === 1 ? "Fund" : "Funde"})`);
+    return r;
   }, "p"]], true);
 }
 
-async function zusammenDialog(g, alleG) {
-  const f = h("div", {}, h("p", { class: "leise" }, `Die Schnittstellen von „${g.name}“ (${g.ip} ${g.mac}) wandern zum gewählten Gerät, „${g.name}“ wird entfernt.`),
-    feld("Ziel-Gerät", auswahl("ziel", alleG.map(x => [x.id, `${x.name}${x.ip ? " – " + x.ip : ""}`]), "")));
-  return dialog("Zu einem Inventar-Gerät hinzufügen", f, [["Abbrechen", null], ["Zusammenführen", () => versuch(() => api("POST", `/api/geraete/${g.id}/zusammenfuehren`, lesenForm(f)), "Zusammengeführt"), "p"]]);
+async function zuGeraetDialog(f, alleG) {
+  const sel = auswahl("ziel", alleG.map(x => [x.id, `${x.name}${x.ip ? " – " + x.ip : ""}`]), "");
+  const box = h("div", {}, h("p", { class: "leise" }, `„${f.name || f.ip}“ (${[f.ip, f.mac].filter(Boolean).join(" · ")}) wird dem gewählten Inventar-Gerät hinzugefügt – als weitere Schnittstelle bzw. als dessen HASS.Agent.`),
+    feld("Gerät", sel));
+  return dialog("Zu einem Gerät hinzufügen", box, [["Abbrechen", null],
+    ["Hinzufügen", () => versuch(() => api("POST", `/api/funde/${f.id}/zuweisen`, { ziel: +sel.value }), "Hinzugefügt"), "p"]]);
 }
 
 // ------------------------------------------------------------------ Netzwerke

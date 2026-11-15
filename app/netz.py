@@ -225,6 +225,32 @@ def direkt_erreichbar(cidr: str) -> bool:
 
 
 # ------------------------------------------------------------------ Wake-on-LAN
+def magic_ethernet(mac: str, wiederholen: int = 3) -> list[str]:
+    """Magic Packet als rohes Ethernet-Paket (EtherType 0x0842) an ff:ff:ff:ff:ff:ff auf allen Schnittstellen (nur Linux)."""
+    mac = mac_norm(mac)
+    if WINDOWS or not mac or not hasattr(socket, "AF_PACKET"):
+        return []
+    nutz = b"\xff" * 6 + bytes.fromhex(mac.replace(":", "")) * 16
+    out = []
+    for _, name in socket.if_nameindex():
+        if name == "lo":
+            continue
+        try:
+            s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
+            try:
+                s.bind((name, 0))
+                eigen = s.getsockname()[4][:6]
+                rahmen = b"\xff" * 6 + eigen + b"\x08\x42" + nutz
+                for _ in range(wiederholen):
+                    s.send(rahmen)
+                out.append(f"Ethernet {name}")
+            finally:
+                s.close()
+        except OSError:
+            continue
+    return out
+
+
 def magic_paket(mac: str, ziele: list[str], port: int = 9, wiederholen: int = 3) -> list[str]:
     mac = mac_norm(mac)
     if not mac:

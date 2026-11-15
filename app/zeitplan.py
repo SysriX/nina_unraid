@@ -123,7 +123,7 @@ def _agent(wer: str) -> str:
     import agent
     c = konfig()["agent"]
     r = agent.abgleich(int(c.get("offline_nach") or 10), bool(c.get("neu_melden")))
-    return (f"{r['agenten']} Agenten, {r['online']} online, {r['verknuepft']} neu verknüpft, {r['offline']} offline gesetzt"
+    return (f"{r['agenten']} Agenten, {r['online']} online, {r['verknuepft']} neu unter „Nicht zugewiesen“, {r['offline']} offline gesetzt"
             + (", um neue Meldung gebeten" if r.get("gemeldet") else ""))
 
 

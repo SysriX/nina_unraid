@@ -10,6 +10,7 @@
 | `app/migrationen.py` | Schema-Version (`AKTUELL`) und Schritte für vorhandene Datenbanken |
 | `app/zugang.py` | Einrichtung, Anmeldung, Benutzer, API-Schlüssel, Rollen |
 | `app/inventar.py` | Geräte, Schnittstellen, Netzwerke, Scan-Abgleich, Online-Status, Wake-on-LAN, Übernehmen/Zusammenführen |
+| `app/funde.py` | Nicht zugewiesene Funde: anlegen aus Scan/OPNsense/Agent, Vorschläge, Zuweisen, Zuweisung aufheben |
 | `app/katalog.py` | Kataloge: Gerätetypen (n:m zu Geräten), Hersteller, Modelle |
 | `app/netz.py` | nmap/Ping-Scan, ARP, Erreichbarkeit, Magic Packet |
 | `app/opnsense.py` | OPNsense-API (ARP, DHCP, WoL) |
@@ -26,6 +27,7 @@
 | --- | --- | --- |
 | 1 | 1.0.0 | Grundschema |
 | 2 | 1.1.0 | `ni_typ`, `ni_geraet_typ`, `ni_hersteller`, `ni_modell`; Geräte mit ihrem Typ verknüpft, Hersteller/Modelle aus dem Inventar übernommen |
+| 3 | 2.0.0 | `ni_fund` (nicht zugewiesene Funde); Geräte mit Status neu/ignoriert und Agenten ohne Gerät wandern dorthin; `ni_geraet.wol_mac` |
 
 ## Datenbank ändern
 

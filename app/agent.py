@@ -14,7 +14,7 @@ import threading
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 
 import kern
 import muster
@@ -262,6 +262,12 @@ class Dienst:
                 if a.geraet_id:
                     inventar.ereignis(s, a.geraet_id, "agent", "HASS.Agent online" if an else "HASS.Agent offline")
                     inventar.online_aktualisieren(s, [a.geraet_id])
+                else:
+                    from modelle import Fund
+                    for f in s.scalars(select(Fund).where(Fund.agent_id == aid)):
+                        f.online = an
+                        if an:
+                            f.zuletzt = jetzt()
         except Exception as e:  # noqa: BLE001
             kern.log("Agent-Status:", e)
 
@@ -540,26 +546,6 @@ class Dienst:
         if not ips:
             return
         self.ips[aid] = set(ips)
-        try:
-            with sitzung() as s:
-                a = s.get(Agent, aid)
-                if not a or not a.geraet_id:
-                    return
-                for sch in s.scalars(select(Schnittstelle).where(Schnittstelle.ip.in_(ips))):
-                    if sch.geraet_id == a.geraet_id:
-                        continue
-                    alt = s.get(Geraet, sch.geraet_id)
-                    ziel = s.get(Geraet, a.geraet_id)
-                    if alt and alt.status == "neu" and ziel and ziel.status == "aktiv":
-                        sch.geraet_id, sch.primaer = a.geraet_id, False
-                        s.flush()
-                        if not s.scalar(select(func.count(Schnittstelle.id)).where(Schnittstelle.geraet_id == alt.id)):
-                            s.delete(alt)
-                        g = s.get(Geraet, a.geraet_id)
-                        if g and sch.mac and not g.wol_aktiv:
-                            g.wol_aktiv = True
-        except Exception as e:  # noqa: BLE001
-            kern.log("Agent-IP:", e)
 
     def net10_seite(self, aid: int, schluessel: str, seiten: str) -> str:
         """Dienst bevorzugen, wenn er online ist und den Befehl kennt (wie die HA-Integration)."""
@@ -577,29 +563,13 @@ class Dienst:
 
     # -------------------------------------------------------------- Gerät verknüpfen
     def _verknuepfen(self, s, a: Agent):
-        import inventar
+        """Agenten werden NIE automatisch einem Gerät zugewiesen: ohne Gerät stehen sie als Fund unter „Nicht zugewiesen“."""
+        import funde
         if a.geraet_id and s.get(Geraet, a.geraet_id):
             return
-        import katalog
-        n = a.name.lower()
-        # nur Geräte, die schon im Inventar sind; neue Funde führt der Benutzer beim Übernehmen zusammen
-        g = s.scalars(select(Geraet).where(func.lower(Geraet.name) == n, Geraet.status == "aktiv")).first()
-        if not g:
-            sch = s.scalars(select(Schnittstelle).join(Geraet, Geraet.id == Schnittstelle.geraet_id).where(
-                Geraet.status == "aktiv", or_(func.lower(Schnittstelle.hostname) == n,
-                                              func.lower(Schnittstelle.hostname).like(n + ".%")))).first()
-            g = s.get(Geraet, sch.geraet_id) if sch else None
-        if not g and inventar.allgemein().get("agent_geraete_anlegen", True):
-            g = Geraet(name=a.name, typ=katalog.gueltiger_typ(s, "pc"), quelle="agent", status="neu", betriebssystem=a.modell[:128])
-            s.add(g)
-            s.flush()
-            katalog.geraet_typen_setzen(s, g, [])
-            inventar.ereignis(s, g.id, "neu", "von HASS.Agent gefunden")
-        if g:
-            a.geraet_id = g.id
-            g.ueberwachen = True          # PC: schnell merken, wenn er aus- oder angeht
-            if not g.betriebssystem and a.modell:
-                g.betriebssystem = a.modell[:128]
+        a.geraet_id = None
+        s.flush()
+        funde.agent_fund(s, a)
 
     def _macs_merken(self, aid: int, attrs: dict):
         """Netzwerk-Sensoren von HASS.Agent liefern MAC + IP je Adapter → als Schnittstellen übernehmen."""
@@ -632,25 +602,22 @@ class Dienst:
         try:
             with sitzung() as s:
                 a = s.get(Agent, aid)
-                if not a or not a.geraet_id:
+                if not a:
+                    return
+                if not a.geraet_id:       # nicht zugewiesen: Adresse nur im Fund vermerken (für Vorschläge)
+                    from modelle import Fund
+                    f = s.scalars(select(Fund).where(Fund.agent_id == aid)).first()
+                    if f:
+                        mac, ip, _ = paare[0]
+                        f.mac = f.mac or mac
+                        f.ip = f.ip or ip
                     return
                 gid = a.geraet_id
                 netze = list(s.scalars(select(inventar.Netzwerk)))
                 for mac, ip, name in paare:
                     sch = s.scalars(select(Schnittstelle).where(Schnittstelle.mac == mac)).first()
                     if sch and sch.geraet_id != gid:
-                        alt = s.get(Geraet, sch.geraet_id)
-                        ziel = s.get(Geraet, gid)
-                        # vom Scan doppelt gefunden → nur übernehmen, wenn das Agent-Gerät schon im Inventar ist
-                        if alt and alt.status == "neu" and ziel and ziel.status == "aktiv":
-                            sch.geraet_id, sch.primaer = gid, False
-                            s.flush()
-                            if not s.scalar(select(func.count(Schnittstelle.id)).where(Schnittstelle.geraet_id == alt.id)):
-                                s.delete(alt)
-                            g = s.get(Geraet, gid)
-                            if g and not g.wol_aktiv:
-                                g.wol_aktiv = True
-                        continue
+                        continue          # gehört zu einem anderen Gerät – nichts automatisch umhängen
                     if not sch:
                         if not ip:
                             continue
@@ -724,11 +691,12 @@ def abgleich(offline_nach_min: int = 10, neu_melden: bool = False) -> dict:
     jetzt_t = _t.time()
     with sitzung() as s:
         agenten = list(s.scalars(select(Agent)))
+        import funde
+        from modelle import Fund
         for a in agenten:
-            if not a.geraet_id:
-                DIENST._verknuepfen(s, a)
-                if a.geraet_id:
-                    verknuepft += 1
+            if not a.geraet_id and not s.scalars(select(Fund.id).where(Fund.agent_id == a.id)).first():
+                funde.agent_fund(s, a)
+                verknuepft += 1
         ids = [(a.id, a.online, kern.utc(a.zuletzt)) for a in agenten]
     for aid, an, zuletzt in ids:
         live = DIENST.online.get(aid)
@@ -753,11 +721,17 @@ def agent_ips(aid: int) -> set:
     try:
         with sitzung() as s:
             for w in s.scalars(select(AgentWert).where(AgentWert.agent_id == aid)):
-                for x in (w.attribute or {}).get("addresses") or []:
-                    if isinstance(x, dict) and x.get("address"):
-                        out.add(x["address"])
                 if w.schluessel == "network_address" and netz.ip_gueltig(w.wert or ""):
                     out.add(w.wert)
+                attr = w.attribute
+                if isinstance(attr, str):          # JSON als Text (z. B. aus einer Kopie/älteren Datenbank)
+                    try:
+                        attr = json.loads(attr)
+                    except ValueError:
+                        attr = {}
+                for x in (attr or {}).get("addresses") or [] if isinstance(attr, dict) else []:
+                    if isinstance(x, dict) and x.get("address") and not str(x["address"]).startswith(("169.254.", "127.")):
+                        out.add(x["address"])
     except Exception:  # noqa: BLE001
         pass
     return out
@@ -907,18 +881,18 @@ async def agent_verknuepfen(aid: int, req: Request, ich: dict = Depends(ADMIN)):
         if not a:
             raise LookupError("Agent gibt es nicht")
         alt = a.geraet_id
-        if d.get("neu"):
-            import katalog
-            g = Geraet(name=a.name, typ=katalog.gueltiger_typ(s, "pc"), quelle="agent", status="neu", betriebssystem=a.modell[:128])
-            s.add(g)
-            s.flush()
-            katalog.geraet_typen_setzen(s, g, [])
-            a.geraet_id = g.id
+        import funde
+        from modelle import Fund
+        gid = None if d.get("neu") else (int(d.get("geraet_id") or 0) or None)
+        if gid and not s.get(Geraet, gid):
+            raise LookupError("Gerät gibt es nicht")
+        a.geraet_id = gid
+        s.flush()
+        if gid:
+            for f in s.scalars(select(Fund).where(Fund.agent_id == aid)):
+                s.delete(f)
         else:
-            gid = int(d.get("geraet_id") or 0) or None
-            if gid and not s.get(Geraet, gid):
-                raise LookupError("Gerät gibt es nicht")
-            a.geraet_id = gid
+            funde.agent_fund(s, a)
         s.flush()
         inventar.online_aktualisieren(s, [alt, a.geraet_id])
         name = a.name

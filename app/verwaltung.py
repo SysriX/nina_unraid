@@ -15,7 +15,7 @@ import muster
 import netz
 import opnsense
 from kern import iso, protokoll, sitzung
-from modelle import (Agent, AgentBefehl, AgentWert, Ereignis, Geraet, GeraetTyp, Hersteller, Modell, Muster, Netzwerk,
+from modelle import (Agent, AgentBefehl, AgentWert, Ereignis, Fund, Geraet, GeraetTyp, Hersteller, Modell, Muster, Netzwerk,
                      Protokoll, Schnittstelle, Typ)
 from zugang import ADMIN, LESER, OPERATOR, client_ip
 
@@ -207,7 +207,7 @@ def muster_standard(req: Request, ich: dict = Depends(ADMIN)):
 
 # ------------------------------------------------------------------ Sicherung
 TABELLEN = [("typen", Typ), ("hersteller", Hersteller), ("modelle", Modell), ("netzwerke", Netzwerk), ("geraete", Geraet),
-            ("geraet_typen", GeraetTyp), ("schnittstellen", Schnittstelle), ("muster", Muster)]
+            ("geraet_typen", GeraetTyp), ("schnittstellen", Schnittstelle), ("muster", Muster), ("funde", Fund)]
 
 
 def _zeile(o) -> dict:
@@ -218,14 +218,19 @@ def _zeile(o) -> dict:
     return d
 
 
-@router.get("/sicherung")
-def sicherung(ich: dict = Depends(ADMIN)):
+def sicherung_daten() -> dict:
     import inventar
     with sitzung() as s:
         daten = {"format": "nina", "version": kern.VERSION, "schema": migrationen.AKTUELL, "erstellt": iso(kern.jetzt()),
                  "allgemein": inventar.allgemein()}
         for name, modell in TABELLEN:
             daten[name] = [_zeile(o) for o in s.scalars(select(modell))]
+    return daten
+
+
+@router.get("/sicherung")
+def sicherung(ich: dict = Depends(ADMIN)):
+    daten = sicherung_daten()
     protokoll(ich["name"], "sicherung", "exportiert")
     return Response(json.dumps(daten, ensure_ascii=False, indent=1), media_type="application/json",
                     headers={"Content-Disposition": f'attachment; filename="nina-{kern.jetzt():%Y%m%d-%H%M}.json"'})
@@ -249,6 +254,7 @@ async def wiederherstellen(req: Request, ich: dict = Depends(ADMIN)):
         for a in s.scalars(select(Agent)):
             a.geraet_id = None
         s.execute(delete(Ereignis))
+        s.execute(delete(Fund))
         s.execute(delete(Schnittstelle))
         s.execute(delete(GeraetTyp))
         s.execute(delete(Geraet))
