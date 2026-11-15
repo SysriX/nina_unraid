@@ -1,140 +1,60 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="NINA">
   <defs>
-    <!-- Schild: dunkler Metallverlauf, schmaler blauer Rand, Grat -->
-    <path id="schild" d="M50 6L84 15L80.5 48Q75 63 50 79Q25 63 19.5 48L16 15Z"/>
-    <path id="feld" d="M50 12.2L76.6 20.2L74 48.5Q69.5 60.5 50 72.6Q30.5 60.5 26 48.5L23.4 20.2Z"/>
-    <linearGradient id="randmetall" x1="20" y1="5" x2="80" y2="85" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#c4f2ff"/><stop offset=".3" stop-color="#5fd2ff"/>
-      <stop offset=".7" stop-color="#1690e0"/><stop offset="1" stop-color="#0a5a9c"/>
+    <linearGradient id="rand" x1="10" y1="8" x2="90" y2="92" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#c4f2ff"/><stop offset=".35" stop-color="#5fd2ff"/>
+      <stop offset=".75" stop-color="#1690e0"/><stop offset="1" stop-color="#0a5a9c"/>
     </linearGradient>
-    <linearGradient id="feldmetall" x1="25" y1="12" x2="75" y2="72" gradientUnits="userSpaceOnUse">
+    <linearGradient id="feld" x1="20" y1="14" x2="80" y2="86" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#4a4e57"/><stop offset=".5" stop-color="#2a2c32"/><stop offset="1" stop-color="#16171a"/>
     </linearGradient>
-    <radialGradient id="licht" cx="38" cy="22" r="34" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    <radialGradient id="licht" cx="34" cy="24" r="40" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff" stop-opacity=".2"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="links" x1="0" y1="6" x2="0" y2="78" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#4a4e57"/>
-      <stop offset=".6" stop-color="#2e3036"/>
-      <stop offset="1" stop-color="#1f2125"/>
-    </linearGradient>
-    <linearGradient id="rechts" x1="0" y1="6" x2="0" y2="78" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#33363d"/>
-      <stop offset=".6" stop-color="#202226"/>
-      <stop offset="1" stop-color="#141518"/>
-    </linearGradient>
-    <linearGradient id="orange" x1="0" y1="6" x2="0" y2="80" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#9fe8ff"/>
-      <stop offset=".5" stop-color="#33c3ff"/>
-      <stop offset="1" stop-color="#0a84d6"/>
-    </linearGradient>
-    <linearGradient id="glanz" x1="0" y1="6" x2="0" y2="50" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#fff" stop-opacity=".22"/>
-      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
-    </linearGradient>
+    <radialGradient id="led" cx="50%" cy="40%" r="60%">
+      <stop offset="0" stop-color="#e6fbff"/><stop offset=".45" stop-color="#4fd0ff"/><stop offset="1" stop-color="#0a78c8"/>
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="1.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
     <linearGradient id="anthrazit" x1="0" y1="0" x2="0" y2="100" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#555962"/>
-      <stop offset="1" stop-color="#25272c"/>
+      <stop offset="0" stop-color="#555962"/><stop offset="1" stop-color="#25272c"/>
     </linearGradient>
-    <!-- Leiterbahnen: waagerecht von der Seite, dann 45° schräg hinter das Schild -->
-    <path id="lMail"  d="M15.5 66H20L30 56"/>
-    <path id="lIdent" d="M10.5 78H31L42 67"/>
-    <path id="lRout"  d="M89.5 78H69L58 67"/>
-    <path id="lAcc"   d="M84.5 66H80L70 56"/>
-    <g id="bahnen"><use href="#lMail"/><use href="#lIdent"/><use href="#lRout"/><use href="#lAcc"/></g>
-    <linearGradient id="pMail" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9fe0ff"/><stop offset=".5" stop-color="#4dc3ff"/><stop offset="1" stop-color="#1676b8"/></linearGradient>
-    <linearGradient id="pIdent" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a8f0c5"/><stop offset=".5" stop-color="#3ddc84"/><stop offset="1" stop-color="#14864a"/></linearGradient>
-    <linearGradient id="pRout" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe08a"/><stop offset=".5" stop-color="#ffc233"/><stop offset="1" stop-color="#b9800a"/></linearGradient>
-    <linearGradient id="pAcc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffaaaa"/><stop offset=".5" stop-color="#ff5a5a"/><stop offset="1" stop-color="#b52222"/></linearGradient>
-    <path id="m" transform="translate(0 -3)" d="M37.86 55.39L31 55.39L36.73 35.24L38.24 35.24L41.78 41.89ZM50.65 33.30L55.60 42.99L59.95 30.65L69 30.65L61.51 55.43L50.87 55.43L38.28 30.65L47.12 30.65Q47.76 30.58 48.83 31.29Q49.91 31.99 50.65 33.30Z"/>
-    <path id="mf" transform="translate(0 -3)" d="M36.73 35.24L38.04 30.65L38.28 30.65L40.61 35.24Z"/>
-    <filter id="mschein" filterUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><feGaussianBlur stdDeviation="3.2"/></filter>
-    <filter id="sschatten" filterUnits="userSpaceOnUse" x="-10" y="-10" width="120" height="120"><feGaussianBlur stdDeviation="2.2"/></filter>
-    <filter id="mschatten" filterUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><feGaussianBlur stdDeviation="1.6"/></filter>
-    <!-- Schild-Spiegelung: höher als beim M, an der Mittelkante geknickt (zwei schräge Flächen) -->
-    <mask id="sform" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><use href="#schild" fill="#fff"/></mask>
-    <clipPath id="slinks"><rect x="0" y="0" width="50" height="100"/></clipPath>
-    <clipPath id="srechts"><rect x="50" y="0" width="50" height="100"/></clipPath>
-    <linearGradient id="sspiegel" x1="0" y1="3" x2="0" y2="36" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#fff" stop-opacity=".42"/>
-      <stop offset=".6" stop-color="#fff" stop-opacity=".16"/>
-      <stop offset="1" stop-color="#fff" stop-opacity=".06"/>
+    <linearGradient id="seele" x1="0" y1="17" x2="0" y2="41" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#b8f0ff"/><stop offset=".45" stop-color="#4fd0ff"/><stop offset="1" stop-color="#0d8ee0"/>
     </linearGradient>
-    <mask id="mform" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><use href="#m" fill="#fff" stroke="#fff" stroke-width="3.2" stroke-linejoin="miter"/><use href="#mf" fill="#fff" stroke="#fff" stroke-width="3.2" stroke-linejoin="miter"/></mask>
-    <mask id="mfase" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><use href="#m" fill="#fff" stroke="#000" stroke-width="1"/></mask>
-    <linearGradient id="mspiegel" x1="0" y1="27" x2="0" y2="41" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#fff" stop-opacity=".62"/>
-      <stop offset=".55" stop-color="#fff" stop-opacity=".3"/>
-      <stop offset="1" stop-color="#fff" stop-opacity=".14"/>
+    <linearGradient id="nspiegel" x1="0" y1="17" x2="0" y2="31" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff" stop-opacity=".6"/><stop offset="1" stop-color="#fff" stop-opacity=".1"/>
     </linearGradient>
-    <filter id="mbogenweich" filterUnits="userSpaceOnUse" x="-20" y="-80" width="140" height="140"><feGaussianBlur stdDeviation=".3"/></filter>
-    <mask id="mkern" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><use href="#m" fill="#fff" stroke="#000" stroke-width="2.2" stroke-linejoin="miter"/></mask>
+    <path id="n" d="M38.50 40.94L32.00 40.94L37.43 21.85L38.86 21.85L42.21 28.15ZM50.62 20.01L55.31 29.19L59.43 17.50L68.00 17.50L60.90 40.98L50.82 40.98L38.90 17.50L47.27 17.50Q47.87 17.43 48.89 18.10Q49.92 18.77 50.62 20.01Z"/>
+    <path id="nf" d="M37.43 21.85L38.67 17.50L38.90 17.50L41.11 21.85Z"/>
+    <mask id="nkern" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><use href="#n" fill="#fff" stroke="#000" stroke-width="2" stroke-linejoin="miter"/></mask>
+    <mask id="nform" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><use href="#n" fill="#fff" stroke="#fff" stroke-width="3" stroke-linejoin="miter"/><use href="#nf" fill="#fff" stroke="#fff" stroke-width="3"/></mask>
+    <filter id="nschatten" filterUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><feGaussianBlur stdDeviation="1.3"/></filter>
   </defs>
-
-  <!-- Leiterbahnen hinter dem Schild: Rand gleichmäßig, Seele in Dienstfarbe -->
-  <g fill="none" stroke-linejoin="round" stroke-linecap="butt">
-    <use href="#bahnen" stroke="#1a1b1f" stroke-width="5"/>
-    <use href="#lMail" stroke="#4dc3ff" stroke-width="2.4"/>
-    <use href="#lIdent" stroke="#3ddc84" stroke-width="2.4"/>
-    <use href="#lRout" stroke="#ffc233" stroke-width="2.4"/>
-    <use href="#lAcc" stroke="#ff5a5a" stroke-width="2.4"/>
+  <!-- Gehäuse: dunkle Kante, blauer Metallrand, dunkles Feld -->
+  <rect x="7" y="7" width="86" height="86" rx="20" fill="#0b0c0e"/>
+  <rect x="9" y="9" width="82" height="82" rx="18.5" fill="url(#rand)"/>
+  <rect x="13" y="13" width="74" height="74" rx="15" fill="url(#feld)"/>
+  <rect x="13" y="13" width="74" height="74" rx="15" fill="url(#licht)"/>
+  <!-- Verbindungen: vom n über den Knoten zu den Geräten -->
+  <g stroke="#4fd0ff" stroke-width="2.6" stroke-linecap="round" fill="none" opacity=".9">
+    <path d="M50 42.4V52M50 52L30 64M50 52L50 66M50 52L70 64"/>
   </g>
+  <circle cx="50" cy="52" r="4.2" fill="url(#led)" filter="url(#glow)"/>
+  <!-- n in Dream MMA: Schatten, dunkler Rand, blaue Seele, Glanz -->
+  <use href="#n" fill="#000" stroke="#000" stroke-width="3" stroke-linejoin="round" opacity=".6" transform="translate(1.2 2.4)" filter="url(#nschatten)"/>
+  <use href="#n" fill="url(#anthrazit)" stroke="url(#anthrazit)" stroke-width="3" stroke-linejoin="miter"/>
+  <use href="#nf" fill="url(#anthrazit)" stroke="url(#anthrazit)" stroke-width="3" stroke-linejoin="miter"/>
+  <g mask="url(#nkern)"><use href="#n" fill="#00508f"/><use href="#n" fill="url(#seele)" transform="translate(0 .4)"/></g>
+  <g mask="url(#nform)"><ellipse cx="48" cy="-10" rx="40" ry="38" transform="rotate(-8 48 -10)" fill="url(#nspiegel)"/></g>
 
-  <!-- Schatten des Schilds auf Leiterbahnen und Untergrund: Schild schwebt darüber -->
-  <use href="#schild" fill="#000" opacity=".75" transform="translate(1.6 3.6)" filter="url(#sschatten)"/>
-
-  <!-- Schild: schmaler blauer Rand, ganzes Feld im dunklen Verlauf, Grat, Fase -->
-  <use href="#schild" fill="url(#randmetall)" stroke="#1a1b1f" stroke-width="2.2" stroke-linejoin="round"/>
-  <g transform="translate(50 44) scale(.925) translate(-50 -44)">
-    <use href="#schild" fill="#0d0e10" transform="translate(0 -.8)"/>
-    <use href="#schild" fill="url(#feldmetall)"/>
-    <path d="M50 6.6V78.4" stroke="#000" stroke-opacity=".2" stroke-width=".8"/>
-    <path d="M50 6.6V78.4" stroke="#fff" stroke-opacity=".07" stroke-width=".6" transform="translate(-.7 0)"/>
-    <path d="M50 3L16 13L19.5 51Q25 68 50 85Z" fill="#fff" fill-opacity=".05"/>
-    <use href="#schild" fill="url(#licht)"/>
-    <use href="#schild" fill="none" stroke="#fff" stroke-opacity=".14" stroke-width=".7" transform="translate(0 .6)"/>
+  <!-- Geräte unten -->
+  <g fill="#1a1b1f" stroke="#c9ccd2" stroke-width="1.5">
+    <rect x="20" y="63" width="20" height="13" rx="2.5"/>
+    <rect x="42" y="66" width="16" height="12" rx="2.5"/>
+    <rect x="60" y="63" width="20" height="13" rx="2.5"/>
   </g>
-
-  <!-- Spiegelung der Sonne auf dem Schild: höher als auf dem M, folgt den zwei Schildflächen -->
-  <g mask="url(#sform)">
-    <g clip-path="url(#slinks)">
-      <ellipse cx="48" cy="-15" rx="42" ry="51" transform="rotate(-8 48 -15)" fill="url(#sspiegel)" filter="url(#mbogenweich)"/>
-    </g>
-    <g clip-path="url(#srechts)" opacity=".7">
-      <ellipse cx="48" cy="-15" rx="42" ry="51" transform="translate(0 -1.6) rotate(-8 48 -15)" fill="url(#sspiegel)" filter="url(#mbogenweich)"/>
-    </g>
-  </g>
-
-  <!-- leichter weißer Schein hinter dem n -->
-  <use href="#m" fill="#fff" stroke="#fff" stroke-width="6" stroke-linejoin="round" opacity=".4" filter="url(#mschein)"/>
-
-  <!-- Schlagschatten auf dem Schild: das n schwebt darüber -->
-  <use href="#m" fill="#000" stroke="#000" stroke-width="3.2" stroke-linejoin="round" opacity=".7" transform="translate(1.8 3.4)" filter="url(#mschatten)"/>
-
-  <!-- n in Dream MMA: dunkler Rand, Fase, blaue Seele -->
-  <use href="#m" fill="url(#anthrazit)" stroke="url(#anthrazit)" stroke-width="3.2" stroke-linejoin="miter"/>
-  <use href="#mf" fill="url(#anthrazit)" stroke="url(#anthrazit)" stroke-width="3.2" stroke-linejoin="miter"/>
-  <use href="#m" fill="#000" fill-opacity=".35" mask="url(#mfase)"/>
-  <g mask="url(#mkern)">
-    <use href="#m" fill="#00508f"/>
-    <use href="#m" fill="url(#orange)" transform="translate(0 .45)"/>
-  </g>
-  <!-- Spiegelung der schräg stehenden Sonne: Bogen in der oberen Hälfte des n -->
-  <g mask="url(#mform)">
-    <ellipse cx="48" cy="-10" rx="42" ry="51" transform="rotate(-8 48 -10)" fill="url(#mspiegel)" filter="url(#mbogenweich)"/>
-  </g>
-
-  <!-- vier Dienste als eckige Lötflächen -->
-  <g stroke="#1a1b1f" stroke-width="1.3">
-    <rect x="6.5" y="61.5" width="9" height="9" rx="1.2" fill="url(#pMail)"/>
-    <rect x="1.5" y="73.5" width="9" height="9" rx="1.2" fill="url(#pIdent)"/>
-    <rect x="89.5" y="73.5" width="9" height="9" rx="1.2" fill="url(#pRout)"/>
-    <rect x="84.5" y="61.5" width="9" height="9" rx="1.2" fill="url(#pAcc)"/>
-  </g>
-  <g fill="none" stroke="#fff" stroke-opacity=".5" stroke-width=".7">
-    <rect x="8.3" y="63.3" width="5.4" height="5.4" rx=".6"/>
-    <rect x="3.3" y="75.3" width="5.4" height="5.4" rx=".6"/>
-    <rect x="91.3" y="75.3" width="5.4" height="5.4" rx=".6"/>
-    <rect x="86.3" y="63.3" width="5.4" height="5.4" rx=".6"/>
+  <g stroke="#4fd0ff" stroke-width="1.6" stroke-linecap="round">
+    <path d="M24 68.5h8M24 71.5h12M46 70.5h8M46 73.5h5M64 68.5h12M64 71.5h7"/>
   </g>
 </svg>

@@ -46,7 +46,7 @@ Ohne nmap scannt NINA per Ping (bis /22).
 
 ## Logo und Symbol
 
-`werkzeuge/nina-logo.js` erzeugt `app/web/logo*.svg` und `icon.svg` (Schrift **Dream MMA**, dafont, 100 % kostenlos, als Pfade; Aufbau wie MIRA, Akzent Blau). Braucht opentype.js und die TTF-Datei:
+`werkzeuge/nina-logo.js` erzeugt `app/web/logo*.svg` (das dort erzeugte Schild-Icon wird nicht verwendet), `werkzeuge/nina-icon.js` das Icon (`icon-a.svg` = n mit Nodes, eingesetzt; `icon-b.svg` = Router mit Nodes) (Schrift **Dream MMA**, dafont, 100 % kostenlos, als Pfade; Aufbau wie MIRA, Akzent Blau). Braucht opentype.js und die TTF-Datei:
 
 ```bash
 DREAM_BASIS=<ordner mit otjs/node_modules/opentype.js und dreammma-dl/x/Dream MMA.ttf> node werkzeuge/nina-logo.js app/web <pfad zu mira icon.svg>
