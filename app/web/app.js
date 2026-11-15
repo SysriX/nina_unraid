@@ -78,6 +78,48 @@ function haken(titel, an, hilfe, name) {
   return { el: h("label", { class: "haken" }, i, h("span", {}, titel, hilfe ? h("small", {}, hilfe) : null)), i };
 }
 function eingabe(name, wert = "", attrs = {}) { return h("input", { name, value: wert ?? "", ...attrs }); }
+
+/** Eigene Vorschlagsliste unter einem Eingabefeld (statt <datalist>, das je nach Browser nur die Beschriftung zeigt).
+ *  liefern() -> [{ wert, info, gruppe? }]; gefiltert wird nach dem eingegebenen Text. Wahl löst „change“ am Feld aus. */
+function vorschlaege(inp, liefern, { max = 60 } = {}) {
+  inp.setAttribute("autocomplete", "off");
+  let box = null, aktiv = -1, treffer = [];
+  const zu = () => { if (box) box.remove(); box = null; aktiv = -1; };
+  const waehle = v => { inp.value = v.wert; zu(); inp.dispatchEvent(new Event("input", { bubbles: true })); inp.dispatchEvent(new Event("change", { bubbles: true })); };
+  const markiere = () => box && [...box.querySelectorAll(".vs-eintrag")].forEach((el, i) => {
+    el.classList.toggle("an", i === aktiv); if (i === aktiv) el.scrollIntoView({ block: "nearest" }); });
+  const auf = (alle = false) => {
+    const q = alle ? "" : inp.value.trim().toLowerCase();
+    treffer = liefern().filter(v => !q || `${v.wert} ${v.info || ""}`.toLowerCase().includes(q)).slice(0, max);
+    if (treffer.length === 1 && treffer[0].wert.toLowerCase() === q) treffer = [];
+    if (!treffer.length) return zu();
+    if (!box) { box = h("div", { class: "vs-liste" }); document.body.append(box); }
+    const r = inp.getBoundingClientRect();
+    const unten = innerHeight - r.bottom > 240 || r.top < 240;
+    Object.assign(box.style, { left: r.left + "px", width: Math.max(r.width, 260) + "px",
+      top: unten ? r.bottom + 2 + "px" : "", bottom: unten ? "" : innerHeight - r.top + 2 + "px" });
+    let gr = null;
+    leeren(box, treffer.flatMap((v, i) => {
+      const kopf = v.gruppe && v.gruppe !== gr ? h("div", { class: "vs-gruppe" }, v.gruppe) : null;
+      gr = v.gruppe;
+      return [kopf, h("div", { class: "vs-eintrag", onmousedown: e => { e.preventDefault(); waehle(v); }, onmouseenter: () => { aktiv = i; markiere(); } },
+        h("b", {}, v.wert), v.info ? h("small", {}, v.info) : null)];
+    }));
+    aktiv = -1;
+  };
+  inp.addEventListener("focus", () => auf(true));
+  inp.addEventListener("click", () => { if (!box) auf(true); });
+  inp.addEventListener("input", e => { if (e.isTrusted) auf(); });
+  inp.addEventListener("blur", () => setTimeout(zu, 120));
+  inp.addEventListener("keydown", e => {
+    if (!box) { if (e.key === "ArrowDown") { auf(true); e.preventDefault(); } return; }
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") { aktiv = (aktiv + (e.key === "ArrowDown" ? 1 : treffer.length - 1)) % treffer.length; markiere(); e.preventDefault(); }
+    else if (e.key === "Enter" && aktiv >= 0) { waehle(treffer[aktiv]); e.preventDefault(); e.stopPropagation(); }
+    else if (e.key === "Escape") { zu(); e.stopPropagation(); }
+  });
+  window.addEventListener("scroll", () => { if (box && document.activeElement === inp) auf(); else zu(); }, true);
+  return inp;
+}
 function auswahl(name, optionen, wert, attrs = {}) {
   return h("select", { name, ...attrs }, optionen.map(o => { const [v, t] = Array.isArray(o) ? o : [o, o]; return h("option", { value: v, selected: String(v) === String(wert ?? "") }, t); }));
 }

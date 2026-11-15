@@ -126,8 +126,8 @@ async function geraetDialog(g = null) {
     h("div", { class: "raster" },
       haken("Wake-on-LAN erlauben", g.wol_aktiv, "Braucht eine MAC-Adresse", "wol_aktiv").el,
       feld("WoL-Weg", auswahl("wol_methode", [["", "Wie das Netzwerk"], ...WOL_METHODEN], g.wol_methode)),
-      feld("WoL-MAC", h("div", {}, eingabe("wol_mac", g.wol_mac || "", { list: "wolmacs", placeholder: "leer = MAC der primären Schnittstelle" }),
-        h("datalist", { id: "wolmacs" }, (g.schnittstellen || []).filter(x => x.mac).map(x => h("option", { value: x.mac }, [x.name, x.mac_hersteller].filter(Boolean).join(" · "))))),
+      feld("WoL-MAC", vorschlaege(eingabe("wol_mac", g.wol_mac || "", { placeholder: "leer = automatisch (RJ45-Karte zuerst)" }),
+        () => (g.schnittstellen || []).filter(x => x.mac).map(x => ({ wert: x.mac, info: [x.art ? NIC_ARTEN[x.art] : "", x.name, x.mac_hersteller].filter(Boolean).join(" · ") }))),
         "z. B. die Onboard-Karte, wenn das Gerät über eine 10-Gbit-Karte im Netz hängt (Windows: ipconfig /all)"),
       haken("Überwachen (regelmäßig anpingen)", g.ueberwachen, "Schnelle Online-Erkennung, z. B. für PCs", "ueberwachen").el,
       haken("An Home Assistant geben", g.ha_import, "Gerät mit Sensoren/Knöpfen in HA anlegen", "ha_import").el));

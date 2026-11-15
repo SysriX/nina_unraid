@@ -15,9 +15,11 @@ function typHerstellerFelder(w, kat) {
   const weitere = new Set((w.typen || []).filter(k => k !== haupt));
   const hauptSel = auswahl("", META.typen, haupt);
   const chips = h("div", { class: "chips" });
-  const hIn = eingabe("", w.hersteller, { list: id + "h", placeholder: "aus Liste wählen oder neu eintragen", autocomplete: "off" });
-  const mIn = eingabe("", w.modell, { list: id + "m", placeholder: "aus Liste wählen oder neu eintragen", autocomplete: "off" });
-  const hListe = h("datalist", { id: id + "h" }), mListe = h("datalist", { id: id + "m" });
+  const hIn = eingabe("", w.hersteller, { placeholder: "aus Liste wählen oder neu eintragen" });
+  const mIn = eingabe("", w.modell, { placeholder: "aus Liste wählen oder neu eintragen" });
+  let hVor = [], mVor = [];
+  vorschlaege(hIn, () => hVor);
+  vorschlaege(mIn, () => mVor);
   const hinweis = h("small", { class: "leise" });
   const gewaehlt = () => new Set([haupt, ...weitere]);
   const zeichneChips = () => leeren(chips, META.typen.filter(([k]) => k !== haupt && k !== "unbekannt").map(([k, n, sym]) => {
@@ -31,11 +33,12 @@ function typHerstellerFelder(w, kat) {
     const passt = m => !m.typ || t.has(m.typ);
     const hs = kat.hersteller.map(x => ({ x, treffer: x.modelle.some(m => m.typ && t.has(m.typ)) }))
       .sort((a, b) => (b.treffer - a.treffer) || a.x.name.localeCompare(b.x.name, "de"));
-    leeren(hListe, hs.map(({ x, treffer }) => h("option", { value: x.name }, treffer ? `${x.modelle.filter(m => m.typ && t.has(m.typ)).length} passende Modelle` : "")));
+    hVor = hs.map(({ x, treffer }) => ({ wert: x.name, info: treffer ? `${x.modelle.filter(m => m.typ && t.has(m.typ)).length} passende Modelle` : `${x.modelle.length} Modelle`,
+      gruppe: hs.some(y => y.treffer) ? (treffer ? "Passend zum Typ" : "Weitere Hersteller") : "" }));
     const her = kat.hersteller.find(x => x.name.toLowerCase() === hn);
     const ms = her ? her.modelle.map(m => ({ m, h: her })) : kat.hersteller.flatMap(x => x.modelle.filter(m => m.typ && t.has(m.typ)).map(m => ({ m, h: x })));
     ms.sort((a, b) => (passt(b.m) - passt(a.m)) || a.m.name.localeCompare(b.m.name, "de"));
-    leeren(mListe, ms.map(({ m, h: x }) => h("option", { value: m.name }, [her ? "" : x.name, m.typ ? typName(m.typ) : ""].filter(Boolean).join(" · "))));
+    mVor = ms.map(({ m, h: x }) => ({ wert: m.name, info: [her ? "" : x.name, m.typ ? typName(m.typ) : ""].filter(Boolean).join(" · ") }));
     hinweis.textContent = her ? `${her.modelle.length} Modelle von ${her.name} im Katalog` : (hn ? "neuer Hersteller – wird beim Speichern in den Katalog übernommen" : "");
   };
   mIn.addEventListener("change", () => {     // Modell gewählt: Hersteller und Typ ergänzen
@@ -56,7 +59,7 @@ function typHerstellerFelder(w, kat) {
   zeichneChips(); listen();
   const el = h("div", {},
     h("div", { class: "raster" }, feld("Haupttyp", hauptSel, "bestimmt Symbol und Home-Assistant-Modell"),
-      feld("Hersteller", h("div", {}, hIn, hListe), null), feld("Modell", h("div", {}, mIn, mListe), null)),
+      feld("Hersteller", hIn, null), feld("Modell", mIn, null)),
     hinweis,
     h("div", { class: "feld" }, h("span", {}, "Weitere Typen"), chips, h("small", {}, "Ein Gerät kann mehrere Typen haben, z. B. Server + Virtuelle Maschine")));
   return { el, werte: () => ({ typ: haupt, typen: [haupt, ...weitere], hersteller: hIn.value.trim(), modell: mIn.value.trim() }) };
