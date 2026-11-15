@@ -12,16 +12,19 @@ Home-Assistant-Integration: [nina_ha_integration](https://github.com/SysriX/nina
 ![Infokarte eines Rechners mit HASS.Agent und Wake-on-LAN](docs/images/geraet.png)
 *Beispieldaten*
 
-> **Stand 1.0.0:** erste Version. Lokal getestet: Einrichtung, Anmeldung, Ping-Scan in einem echten Netz, Geräte/Schnittstellen/Netzwerke, Wake-on-LAN (Container-Broadcast), API für Home Assistant, Schema-Migration. HASS.Agent .NET10 mit echten aufgezeichneten Nachrichten geprüft (Befehle nur an einen Test-Stub). **Noch nicht gegen echte Systeme getestet:** nmap im Container, OPNsense-API (ARP/DHCP/WoL), Live-MQTT-Verbindung, MariaDB.
+> **Stand 1.1.0:** Kataloge für Gerätetypen (mehrere je Gerät), Hersteller und Modelle; neue Funde kommen nie automatisch ins Inventar, beim Übernehmen lassen sich Scan- und Agent-Funde zusammenführen. Datenbank-Update von 1.0 (Schema 1 → 2) mit echter 1.0-Datenbank getestet.
+>
+> **1.0.0:** erste Version. Lokal getestet: Einrichtung, Anmeldung, Ping-Scan in einem echten Netz, Geräte/Schnittstellen/Netzwerke, Wake-on-LAN (Container-Broadcast), API für Home Assistant, Schema-Migration. HASS.Agent .NET10 mit echten aufgezeichneten Nachrichten geprüft (Befehle nur an einen Test-Stub). **Noch nicht gegen echte Systeme getestet:** nmap im Container, OPNsense-API (ARP/DHCP/WoL), Live-MQTT-Verbindung, MariaDB.
 
 ## Was es kann
 
 | Bereich | Inhalt |
 | --- | --- |
-| **Geräte** | Name, Typ (PC, Laptop, Server, NAS, Switch/AP, Router, Drucker, Telefon, IoT …), **Benutzer** (wer daran arbeitet), angemeldeter Benutzer (vom HASS.Agent), Hersteller, Modell, Betriebssystem, Serien-/Inventarnummer, Standort, Raum-Kürzel für HA, Schlagwörter, Notizen, **eigene Zusatzfelder** |
+| **Geräte** | Name, **Haupttyp + weitere Typen** (z. B. Server + Virtuelle Maschine), **Benutzer** (wer daran arbeitet), angemeldeter Benutzer (vom HASS.Agent), Hersteller, Modell, Betriebssystem, Serien-/Inventarnummer, Standort, Raum-Kürzel für HA, Schlagwörter, Notizen, **eigene Zusatzfelder** |
 | **Schnittstellen** | je Gerät beliebig viele: IP, MAC, Hostname, MAC-Hersteller, Netz, primär, feste IP |
 | **Netzwerke** | mehrere Netze/VLANs, je Netz Scan an/aus, Intervall, Methode (nmap, Ping, nur OPNsense) und Wake-on-LAN-Weg |
-| **Automatisch finden** | nmap/Ping-Scan (im eigenen Netz mit MAC), **OPNsense** ARP-Tabelle + DHCP-Leases (ISC, Kea, Dnsmasq) für alle VLANs, **HASS.Agent**. Neue Geräte landen unter „Neu gefunden“ (übernehmen, ignorieren, zusammenführen) oder direkt im Inventar; Typ wird aus Hersteller/Hostname geraten |
+| **Automatisch finden** | nmap/Ping-Scan (im eigenen Netz mit MAC), **OPNsense** ARP-Tabelle + DHCP-Leases (ISC, Kea, Dnsmasq) für alle VLANs, **HASS.Agent**. Neue Geräte landen **immer** unter „Neu gefunden“; ins Inventar kommen sie nur durch **Übernehmen** – dabei schlägt NINA passende andere Funde vor (gleicher Name, IP oder MAC, z. B. Scan + HASS.Agent desselben PCs) und führt die ausgewählten zusammen. Typ wird aus Hersteller/Hostname geraten |
+| **Kataloge** | **Gerätetypen** frei pflegbar (Name, Symbol, HA-Symbol, Reihenfolge); **Hersteller und Modelle** (Modell mit Typ, z. B. Brother · HL-2040 · Drucker). Im Geräteformular stehen zum gewählten Typ passende Hersteller/Modelle oben; was neu eingetragen wird, kommt automatisch in den Katalog. Umbenennen im Katalog ändert die Angabe an allen Geräten |
 | **Online-Status** | aus Scans, ARP, Ping-Überwachung (einstellbar je Gerät) und HASS.Agent; Ereignis-Verlauf (neu, online/offline, IP geändert, WoL, Befehle) |
 | **Wake-on-LAN** | wahlweise **aus dem Container** (Broadcast ins eigene Netz bzw. gerichteter Broadcast) oder **über die OPNsense** (Plugin os-wol) in andere Netze, oder beides; automatisch je Netz |
 | **HASS.Agent** | klassischer HASS.Agent (MQTT-Discovery) **und HASS.Agent .NET10** (eigenes MQTT-Protokoll `hass.agent/…`). Infokarte je Rechner mit Live-Werten (CPU, RAM, Laufwerk, Laufzeit, angemeldeter Benutzer …) und allen Befehlen, die der Agent anbietet |
@@ -64,7 +67,7 @@ Danach unter **Netzwerke** alle Netze/VLANs eintragen und unter **Einstellungen*
 
 - Das Schema hat eine **Versionsnummer** (`ni_schema`). Ein neueres Image zieht die Datenbank beim Start selbst nach (`app/migrationen.py`, je Version ein Schritt); SQLite wird vorher als `<datei>.vor-v<alt>` kopiert. Ein **älteres** Image startet nicht mit einer neueren Datenbank.
 - **Zusatzfelder** (Einstellungen › Allgemein) erweitern Geräte ohne Schema-Änderung (Spalte `extra`, JSON) – auch an Home Assistant übergeben.
-- **Sicherung** (Einstellungen › Datenbank & Sicherung): Export/Import als JSON (Netzwerke, Geräte, Schnittstellen, Muster). Bei MariaDB zusätzlich `mysqldump`.
+- **Sicherung** (Einstellungen › Datenbank & Sicherung): Export/Import als JSON (Kataloge, Netzwerke, Geräte, Schnittstellen, Muster; Sicherungen aus 1.0 lassen sich einspielen). Bei MariaDB zusätzlich `mysqldump`.
 - Die HA-API ist versioniert (`/api/ha/v1`); brechende Änderungen kämen als `v2` neben `v1`.
 - Entwickeln: siehe [ENTWICKLUNG.md](ENTWICKLUNG.md).
 

@@ -154,3 +154,6 @@ td .zwei-zeilen small{display:block;color:var(--leise);font-size:12px}
 .mono{white-space:nowrap}
 .log .marke{flex:none;align-self:flex-start}
 .tab-wrap td{white-space:nowrap}
+.chip.an{background:color-mix(in srgb,var(--akzent) 22%,transparent);color:var(--text)}
+.chips label.chip{gap:2px;padding:3px 10px 3px 6px;white-space:nowrap}
+.chips label.chip input{width:auto;margin:0 4px 0 0}

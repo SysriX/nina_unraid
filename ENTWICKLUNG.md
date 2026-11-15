@@ -9,7 +9,8 @@
 | `app/modelle.py` | SQLAlchemy-Modelle – **immer der neueste Schema-Stand** |
 | `app/migrationen.py` | Schema-Version (`AKTUELL`) und Schritte für vorhandene Datenbanken |
 | `app/zugang.py` | Einrichtung, Anmeldung, Benutzer, API-Schlüssel, Rollen |
-| `app/inventar.py` | Geräte, Schnittstellen, Netzwerke, Scan-Abgleich, Online-Status, Wake-on-LAN |
+| `app/inventar.py` | Geräte, Schnittstellen, Netzwerke, Scan-Abgleich, Online-Status, Wake-on-LAN, Übernehmen/Zusammenführen |
+| `app/katalog.py` | Kataloge: Gerätetypen (n:m zu Geräten), Hersteller, Modelle |
 | `app/netz.py` | nmap/Ping-Scan, ARP, Erreichbarkeit, Magic Packet |
 | `app/opnsense.py` | OPNsense-API (ARP, DHCP, WoL) |
 | `app/agent.py` | HASS.Agent über MQTT (klassische Discovery und .NET10-Protokoll), Befehle |
@@ -17,6 +18,13 @@
 | `app/haapi.py` | API für Home Assistant `/api/ha/v1` |
 | `app/dienste.py` | Hintergrund-Schleifen (Scans, Überwachung, OPNsense, Agent speichern, Aufräumen), mDNS |
 | `app/web/` | Oberfläche (Vanilla-JS, Stil wie MIRA) |
+
+## Schema-Versionen
+
+| Schema | Version | Inhalt |
+| --- | --- | --- |
+| 1 | 1.0.0 | Grundschema |
+| 2 | 1.1.0 | `ni_typ`, `ni_geraet_typ`, `ni_hersteller`, `ni_modell`; Geräte mit ihrem Typ verknüpft, Hersteller/Modelle aus dem Inventar übernommen |
 
 ## Datenbank ändern
 

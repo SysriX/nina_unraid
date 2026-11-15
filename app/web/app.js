@@ -151,7 +151,7 @@ function kopieren(text) {
 // ------------------------------------------------------------------ Navigation / Rahmen
 const NAVI = [
   ["", [["uebersicht", "Übersicht"]]],
-  ["Inventar", [["geraete", "Geräte"], ["neu", "Neu gefunden", null, null, "neu"], ["netzwerke", "Netzwerke"], ["ereignisse", "Ereignisse"]]],
+  ["Inventar", [["geraete", "Geräte"], ["neu", "Neu gefunden", null, null, "neu"], ["netzwerke", "Netzwerke"], ["kataloge", "Kataloge"], ["ereignisse", "Ereignisse"]]],
   ["HASS.Agent", [["agenten", "Agenten"], ["muster", "Sensor-Erkennung"]]],
   ["System", [["einstellungen", "Einstellungen", null, "admin"], ["benutzer", "Benutzer & API", null, "admin"],
               ["protokoll", "Protokoll", null, "operator"]]],

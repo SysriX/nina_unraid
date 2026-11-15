@@ -85,10 +85,11 @@ async def _laufzeit(req, e):
 import agent  # noqa: E402
 import haapi  # noqa: E402
 import inventar  # noqa: E402
+import katalog  # noqa: E402
 import verwaltung  # noqa: E402
 import zugang  # noqa: E402
 
-for r in (zugang.router, inventar.router, agent.router, verwaltung.router, haapi.router):
+for r in (zugang.router, inventar.router, katalog.router, agent.router, verwaltung.router, haapi.router):
     app.include_router(r)
 
 

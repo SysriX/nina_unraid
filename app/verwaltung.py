@@ -15,7 +15,8 @@ import muster
 import netz
 import opnsense
 from kern import iso, protokoll, sitzung
-from modelle import Agent, AgentBefehl, AgentWert, Ereignis, Geraet, Muster, Netzwerk, Protokoll, Schnittstelle
+from modelle import (Agent, AgentBefehl, AgentWert, Ereignis, Geraet, GeraetTyp, Hersteller, Modell, Muster, Netzwerk,
+                     Protokoll, Schnittstelle, Typ)
 from zugang import ADMIN, LESER, OPERATOR, client_ip
 
 router = APIRouter(prefix="/api")
@@ -39,7 +40,7 @@ async def allgemein_speichern(req: Request, ich: dict = Depends(ADMIN)):
     import inventar
     d = await req.json()
     a = inventar.allgemein()
-    if d.get("neue_geraete", a["neue_geraete"]) not in ("pruefen", "anlegen", "nein"):
+    if d.get("neue_geraete", a["neue_geraete"]) not in ("pruefen", "nein"):
         raise HTTPException(400, "Unbekannte Wahl für neue Geräte")
     felder = []
     for f in d.get("zusatzfelder") or []:
@@ -205,7 +206,8 @@ def muster_standard(req: Request, ich: dict = Depends(ADMIN)):
 
 
 # ------------------------------------------------------------------ Sicherung
-TABELLEN = [("netzwerke", Netzwerk), ("geraete", Geraet), ("schnittstellen", Schnittstelle), ("muster", Muster)]
+TABELLEN = [("typen", Typ), ("hersteller", Hersteller), ("modelle", Modell), ("netzwerke", Netzwerk), ("geraete", Geraet),
+            ("geraet_typen", GeraetTyp), ("schnittstellen", Schnittstelle), ("muster", Muster)]
 
 
 def _zeile(o) -> dict:
@@ -238,7 +240,8 @@ def _ist_zeit(spalte) -> bool:
 
 @router.post("/sicherung")
 async def wiederherstellen(req: Request, ich: dict = Depends(ADMIN)):
-    """Ersetzt Netzwerke, Geräte, Schnittstellen und Muster durch den Inhalt der Sicherung."""
+    """Ersetzt Kataloge, Netzwerke, Geräte, Schnittstellen und Muster durch den Inhalt der Sicherung.
+    Eine Sicherung von 1.0 (ohne Kataloge) bekommt die Standard-Typen, Geräte werden mit ihrem Typ verknüpft."""
     d = await req.json()
     if d.get("format") != "nina":
         raise HTTPException(400, "Keine NINA-Sicherung")
@@ -247,11 +250,18 @@ async def wiederherstellen(req: Request, ich: dict = Depends(ADMIN)):
             a.geraet_id = None
         s.execute(delete(Ereignis))
         s.execute(delete(Schnittstelle))
+        s.execute(delete(GeraetTyp))
         s.execute(delete(Geraet))
         s.execute(delete(Netzwerk))
         s.execute(delete(Muster))
+        s.execute(delete(Modell))
+        s.execute(delete(Hersteller))
+        if d.get("typen"):
+            s.execute(delete(Typ))
         s.flush()
         for name, modell in TABELLEN:
+            if name == "typen" and not d.get("typen"):
+                continue
             spalten = {c.key: c for c in modell.__table__.columns}
             for z in d.get(name) or []:
                 werte = {}
@@ -263,6 +273,15 @@ async def wiederherstellen(req: Request, ich: dict = Depends(ADMIN)):
                     werte[k] = v
                 s.add(modell(**werte))
             s.flush()
+        if not d.get("geraet_typen"):          # Sicherung aus 1.0
+            import katalog
+            ids = katalog.typ_ids(s)
+            for g in s.scalars(select(Geraet)):
+                if g.typ not in ids:
+                    g.typ = "unbekannt"
+                s.add(GeraetTyp(geraet_id=g.id, typ_id=ids[g.typ]))
+                if g.status == "aktiv":
+                    katalog.eintragen(s, g.hersteller, g.modell, g.typ)
     if d.get("allgemein"):
         kern.einstellung_setzen("allgemein", d["allgemein"])
     muster.neu_laden()

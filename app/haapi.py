@@ -21,12 +21,15 @@ API_VERSION = 1
 
 @router.get("/info")
 def info(ich: dict = Depends(LESER)):
+    import katalog
+    with sitzung() as s:
+        typen = [{"schluessel": t.schluessel, "name": t.name, "icon": t.icon} for t in katalog.typen(s)]
     return {"id": kern.instanz_id(), "name": inventar.allgemein()["name"], "version": kern.VERSION, "api": API_VERSION,
-            "schema": migrationen.AKTUELL, "rolle": ich["rolle"]}
+            "schema": migrationen.AKTUELL, "rolle": ich["rolle"], "typen": typen}
 
 
 def _ha_geraet(s, g: Geraet, d: dict) -> dict:
-    out = {k: d.get(k) for k in ("id", "name", "typ", "typ_name", "hersteller", "modell", "raum", "standort", "benutzer",
+    out = {k: d.get(k) for k in ("id", "name", "typ", "typ_name", "typen", "typ_namen", "hersteller", "modell", "raum", "standort", "benutzer",
                                  "angemeldet", "online", "zuletzt_online", "ip", "mac", "hostname", "netzwerk", "wol", "tags")}
     out.update(betriebssystem=g.betriebssystem, seriennummer=g.seriennummer, inventarnummer=g.inventarnummer,
                ueberwachen=g.ueberwachen, extra=g.extra or {})
@@ -48,11 +51,13 @@ def _ha_geraet(s, g: Geraet, d: dict) -> dict:
 @router.get("/geraete")
 def geraete(ich: dict = Depends(LESER)):
     with sitzung() as s:
+        import katalog
         netze = {n.id: n.name for n in s.scalars(select(Netzwerk))}
         agenten = {a.geraet_id: a for a in s.scalars(select(Agent).where(Agent.geraet_id.is_not(None)))}
+        tn, gt = inventar.typnamen(s), katalog.alle_geraet_typen(s)
         out = []
         for g in s.scalars(select(Geraet).where(Geraet.status == "aktiv", Geraet.ha_import.is_(True)).order_by(Geraet.name)):
-            out.append(_ha_geraet(s, g, inventar.geraet_json(s, g, netze=netze, agenten=agenten)))
+            out.append(_ha_geraet(s, g, inventar.geraet_json(s, g, netze=netze, agenten=agenten, tnamen=tn, gtypen=gt)))
     return {"id": kern.instanz_id(), "geraete": out}
 
 

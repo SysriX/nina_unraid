@@ -1,9 +1,7 @@
 /* NINA – Ansichten: Übersicht, Geräte, Gerät, Neu gefunden, Netzwerke, Ereignisse */
 "use strict";
 
-const TYP_SYMBOL = { pc: "🖥", laptop: "💻", server: "🗄", vm: "◫", nas: "🗃", netzwerk: "⇄", router: "🛡", drucker: "🖨", telefon: "📱",
-  tablet: "▭", tv: "📺", kamera: "📷", iot: "💡", konsole: "🎮", sonstiges: "◇", unbekannt: "?" };
-const typSymbol = t => h("span", { class: "typ-symbol", title: t }, TYP_SYMBOL[t] || "◇");
+const typSymbol = t => h("span", { class: "typ-symbol", title: typName(t) }, (META.typen.find(x => x[0] === t) || [])[2] || "◇");
 const typName = t => (META.typen.find(x => x[0] === t) || [t, t])[1];
 const onlineMarke = g => g.online ? h("span", { class: "status-zeile" }, punkt("ok"), "online") : h("span", { class: "status-zeile" }, punkt(""), h("span", { class: "leise" }, "offline"));
 const WOL_METHODEN = [["auto", "Automatisch"], ["container", "Container (Broadcast)"], ["opnsense", "OPNsense"], ["beide", "Container + OPNsense"]];
@@ -57,14 +55,15 @@ ANSICHT.geraete = { titel: "Geräte", async zeigen(main, q) {
   const box = h("div");
   const zeichnen = () => {
     const s = FILTER.suche.toLowerCase();
-    const liste = daten.filter(g => (!FILTER.typ || g.typ === FILTER.typ) && (!FILTER.netz || g.netzwerk === FILTER.netz)
+    const liste = daten.filter(g => (!FILTER.typ || (g.typen || [g.typ]).includes(FILTER.typ)) && (!FILTER.netz || g.netzwerk === FILTER.netz)
       && (!FILTER.online || (FILTER.online === "online") === g.online)
       && (!s || [g.name, g.ip, g.mac, g.hostname, g.benutzer, g.angemeldet, g.hersteller, g.modell, g.standort, ...(g.tags || [])].some(x => (x || "").toLowerCase().includes(s))));
     leeren(box, h("div", { class: "karte" }, h("h2", {}, `${liste.length} von ${daten.length} Geräten`),
       tabelle([
         { t: "", w: g => g.online ? punkt("ok") : punkt(""), sort: g => g.online ? 0 : 1 },
         { t: "Name", w: g => h("div", { class: "zwei-zeilen" }, h("b", {}, g.name), g.hostname && g.hostname.split(".")[0].toLowerCase() !== g.name.toLowerCase() ? h("small", {}, g.hostname) : null), sort: g => g.name.toLowerCase() },
-        { t: "Typ", w: g => h("span", {}, typSymbol(g.typ), " ", g.typ_name), sort: g => g.typ_name },
+        { t: "Typ", w: g => h("div", { class: "zwei-zeilen" }, h("span", {}, typSymbol(g.typ), " ", g.typ_name),
+            (g.typ_namen || []).length > 1 ? h("small", {}, "+ " + g.typ_namen.slice(1).join(", ")) : null), sort: g => g.typ_name },
         { t: "Benutzer", w: g => h("div", { class: "zwei-zeilen" }, g.benutzer || "", g.angemeldet && g.angemeldet !== g.benutzer ? h("small", {}, "angemeldet: " + g.angemeldet) : null) },
         { t: "IP", w: g => h("span", { class: "mono" }, g.ip), sort: g => (g.ip || "").split(".").map(x => x.padStart(3, "0")).join(".") },
         { t: "MAC", w: g => h("span", { class: "mono" }, g.mac) },
@@ -98,14 +97,12 @@ async function wecken(g) {
 /** Gerät anlegen/bearbeiten */
 async function geraetDialog(g = null) {
   const neu = !g;
-  g = g || { typ: "pc", status: "aktiv", ha_import: true, ueberwachen: false, wol_aktiv: false, wol_methode: "", tags: [], extra: {} };
+  g = g || { typ: "pc", typen: ["pc"], status: "aktiv", ha_import: true, ueberwachen: false, wol_aktiv: false, wol_methode: "", tags: [], extra: {} };
+  const th = typHerstellerFelder(g, await katalogLaden(true));
   const f = h("div", {},
     h("div", { class: "raster" },
       feld("Name *", eingabe("name", g.name, { required: true })),
-      feld("Typ", auswahl("typ", META.typen, g.typ)),
       feld("Benutzer", eingabe("benutzer", g.benutzer, { placeholder: "wer arbeitet an dem Gerät" })),
-      feld("Hersteller", eingabe("hersteller", g.hersteller)),
-      feld("Modell", eingabe("modell", g.modell)),
       feld("Betriebssystem", eingabe("betriebssystem", g.betriebssystem)),
       feld("Seriennummer", eingabe("seriennummer", g.seriennummer)),
       feld("Inventarnummer", eingabe("inventarnummer", g.inventarnummer)),
@@ -113,6 +110,7 @@ async function geraetDialog(g = null) {
       feld("Raum-Kürzel (Home Assistant)", eingabe("raum", g.raum, { placeholder: "bu, wz, … leer = haus" }), "Vorne in der Entitäts-ID: <raum>_net_<gerät>_…"),
       feld("Schlagwörter", eingabe("tags", (g.tags || []).join(", "), { placeholder: "kommagetrennt" })),
       neu ? null : feld("Status", auswahl("status", [["aktiv", "Im Inventar"], ["neu", "Neu (ungeprüft)"], ["ignoriert", "Ignoriert"], ["ausgemustert", "Ausgemustert"]], g.status))),
+    th.el,
     neu ? h("div", { class: "raster" }, feld("IP-Adresse", eingabe("ip", "", { placeholder: "192.168.10.20" })), feld("MAC-Adresse", eingabe("mac", "", { placeholder: "aa:bb:cc:dd:ee:ff" })),
       h("div", {}, haken("Feste IP (Scan ändert sie nicht)", false, null, "feste_ip").el)) : null,
     META.zusatzfelder.length ? h("div", { class: "raster", id: "zusatz" }, META.zusatzfelder.map(z => {
@@ -128,7 +126,7 @@ async function geraetDialog(g = null) {
       haken("Überwachen (regelmäßig anpingen)", g.ueberwachen, "Schnelle Online-Erkennung, z. B. für PCs", "ueberwachen").el,
       haken("An Home Assistant geben", g.ha_import, "Gerät mit Sensoren/Knöpfen in HA anlegen", "ha_import").el));
   const r = await dialog(neu ? "Gerät hinzufügen" : `„${g.name}“ bearbeiten`, f, [["Abbrechen", null], ["Speichern", async () => {
-    const d = lesenForm(f);
+    const d = { ...lesenForm(f), ...th.werte() };
     d.extra = {};
     for (const k of Object.keys(d)) if (k.startsWith("x_")) { d.extra[k.slice(2)] = d[k]; delete d[k]; }
     if (!neu) d.id = g.id;
@@ -149,7 +147,7 @@ ANSICHT.geraet = { titel: "Gerät", async zeigen(main, q) {
         h("h2", {}, typSymbol(g.typ), g.name, g.status !== "aktiv" ? marke(g.status, "warn") : null,
           h("span", { class: "rechts" }, darf("operator") ? h("button", { class: "klein", onclick: () => geraetDialog(g) }, "Bearbeiten") : null)),
         h("dl", { class: "daten" },
-          [["Typ", g.typ_name], ["Benutzer", g.benutzer], ["Angemeldet", g.angemeldet], ["Hersteller", g.hersteller], ["Modell", g.modell],
+          [["Typ", (g.typ_namen || [g.typ_name]).join(", ")], ["Benutzer", g.benutzer], ["Angemeldet", g.angemeldet], ["Hersteller", g.hersteller], ["Modell", g.modell],
            ["Betriebssystem", g.betriebssystem], ["Seriennummer", g.seriennummer], ["Inventarnummer", g.inventarnummer],
            ["Standort", g.standort], ["Raum (HA)", g.raum], ["Schlagwörter", (g.tags || []).join(", ")],
            ...META.zusatzfelder.map(z => [z.titel, (g.extra || {})[z.name]]),
@@ -249,17 +247,15 @@ ANSICHT.neu = { titel: "Neu gefunden", async zeigen(main) {
     const alleG = (await api("GET", "/api/geraete?status=aktiv")).geraete;
     ZAHLEN.neu = liste.length;
     leeren(main,
-      h("p", { class: "leise" }, "Vom Scan oder der OPNsense gefundene Geräte, die noch nicht im Inventar sind. Übernehmen, ignorieren (taucht nicht wieder auf) oder mit einem vorhandenen Gerät zusammenführen."),
+      h("p", { class: "leise" }, "Vom Scan, der OPNsense oder einem HASS.Agent gefundene Geräte – sie kommen nie automatisch ins Inventar. Beim Übernehmen lassen sich doppelte Funde (z. B. Scan + Agent desselben PCs) gleich zusammenführen. Ignorierte tauchen nicht wieder auf."),
       h("div", { class: "karte" }, h("h2", {}, `${liste.length} neue Geräte`, liste.length && darf("operator") ? h("span", { class: "rechts" },
-        h("button", { class: "klein", onclick: async () => { if (!(await bestaetigen(`Alle ${liste.length} ins Inventar übernehmen?`, "Alle übernehmen", false))) return;
-          for (const g of liste) await api("POST", `/api/geraete/${g.id}/status`, { status: "aktiv" }); laden(); } }, "Alle übernehmen"),
         h("button", { class: "klein", onclick: async () => { if (!(await bestaetigen(`Alle ${liste.length} ignorieren?`, "Alle ignorieren"))) return;
           for (const g of liste) await api("POST", `/api/geraete/${g.id}/status`, { status: "ignoriert" }); laden(); } }, "Alle ignorieren")) : null),
         tabelle([
           { t: "", w: g => punkt(g.online ? "ok" : "") },
           { t: "Name", w: g => h("b", {}, g.name) }, { t: "Vermutung", w: g => h("span", {}, typSymbol(g.typ), " ", g.typ_name) },
           { t: "IP", w: g => h("span", { class: "mono" }, g.ip) }, { t: "MAC", w: g => h("span", { class: "mono" }, g.mac) },
-          { t: "Hersteller", w: g => g.hersteller }, { t: "Netz", w: g => g.netzwerk }, { t: "Quelle", w: g => g.quelle },
+          { t: "Hersteller", w: g => g.hersteller }, { t: "Netz", w: g => g.netzwerk }, { t: "Quelle", w: g => g.agent ? "HASS.Agent" : g.quelle },
           { t: "", w: g => darf("operator") ? h("div", { class: "knopfreihe" },
             h("button", { class: "klein p", onclick: () => uebernehmenDialog(g).then(r => r && laden()) }, "Übernehmen"),
             h("button", { class: "klein", onclick: () => zusammenDialog(g, alleG).then(r => r && laden()) }, "Zusammenführen"),
@@ -270,10 +266,42 @@ ANSICHT.neu = { titel: "Neu gefunden", async zeigen(main) {
   alle(30, laden);
 } };
 
+/** Gerät ins Inventar übernehmen – dabei andere Funde (Scan, Agent, OPNsense) direkt zusammenführen. */
 async function uebernehmenDialog(g) {
-  const f = h("div", { class: "raster" }, feld("Name", eingabe("name", g.name)), feld("Typ", auswahl("typ", META.typen, g.typ)),
-    feld("Benutzer", eingabe("benutzer", "")), feld("Raum-Kürzel", eingabe("raum", "", { placeholder: "optional" })));
-  return dialog(`„${g.name}“ übernehmen`, f, [["Abbrechen", null], ["Übernehmen", () => versuch(() => api("POST", `/api/geraete/${g.id}/status`, { status: "aktiv", ...lesenForm(f) }), "Übernommen"), "p"]]);
+  const [v, kat] = await Promise.all([api("GET", `/api/geraete/${g.id}/vorschlaege`), katalogLaden(true)]);
+  const wahl = new Set(v.vorschlaege.filter(x => x.status === "neu" && x.gruende.length).map(x => x.id));
+  let ziel = null;     // gewähltes Inventar-Gerät, in das stattdessen alles einfließt
+  const th = typHerstellerFelder(g, kat);
+  const kopf = h("div", { class: "raster" }, feld("Name", eingabe("name", g.name)),
+    feld("Benutzer", eingabe("benutzer", g.benutzer || "")), feld("Raum-Kürzel", eingabe("raum", g.raum || "", { placeholder: "optional" })),
+    feld("Standort", eingabe("standort", g.standort || "")));
+  const quelle = x => [x.agent_name ? "HASS.Agent" : "", x.quelle].filter(Boolean)[0] || x.quelle;
+  const liste = h("div");
+  const zeichne = () => leeren(liste, v.vorschlaege.length ? tabelle([
+    { t: "", w: x => x.status === "neu"
+        ? h("input", { type: "checkbox", checked: wahl.has(x.id), disabled: !!ziel, onchange: e => { e.target.checked ? wahl.add(x.id) : wahl.delete(x.id); } })
+        : h("input", { type: "radio", name: "ziel", checked: ziel === x.id, title: "stattdessen in dieses Inventar-Gerät übernehmen",
+            onclick: e => { ziel = ziel === x.id ? null : x.id; e.target.checked = ziel === x.id; zeichne(); } }) },
+    { t: "Gerät", w: x => h("div", { class: "zwei-zeilen" }, h("b", {}, x.name), h("small", {}, x.status === "neu" ? "neu gefunden · " + quelle(x) : "im Inventar")) },
+    { t: "Typ", w: x => h("span", {}, typSymbol(x.typ), " ", x.typ_name) },
+    { t: "IP / MAC", w: x => h("div", { class: "zwei-zeilen mono" }, x.ip, h("small", {}, x.mac)) },
+    { t: "Passt wegen", w: x => x.gruende.length ? x.gruende.map(r => marke(r, "ok")) : h("span", { class: "leise" }, "–") },
+  ], v.vorschlaege) : h("p", { class: "leise" }, "Keine weiteren Funde."));
+  zeichne();
+  const f = h("div", {}, kopf, th.el,
+    h("h4", {}, "Zusammenführen"),
+    h("p", { class: "leise klein-t" }, "Haken: dieser Fund wird mit übernommen (Schnittstellen, HASS.Agent und Verlauf wandern in dieses Gerät, der Fund verschwindet). Vorausgewählt ist, was über Name, IP oder MAC passt. Kreis bei einem Inventar-Gerät: statt neu anzulegen, wird alles diesem Gerät zugeschlagen."),
+    liste);
+  return dialog(`„${g.name}“ übernehmen`, f, [["Abbrechen", null], ["Übernehmen", async () => {
+    if (ziel) {
+      await versuch(() => api("POST", `/api/geraete/${g.id}/zusammenfuehren`, { ziel }));
+      for (const id of wahl) await api("POST", `/api/geraete/${id}/zusammenfuehren`, { ziel }).catch(() => {});
+      hinweis("Zum Inventar-Gerät hinzugefügt");
+      return true;
+    }
+    return versuch(() => api("POST", `/api/geraete/${g.id}/status`, { status: "aktiv", ...lesenForm(kopf), ...th.werte(), zusammen: [...wahl] }),
+      wahl.size ? `Übernommen, ${wahl.size} zusammengeführt` : "Übernommen");
+  }, "p"]], true);
 }
 
 async function zusammenDialog(g, alleG) {

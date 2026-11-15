@@ -28,7 +28,7 @@ from sqlalchemy.schema import CreateIndex
 import kern
 from modelle import Basis, Schema
 
-AKTUELL = 1
+AKTUELL = 2
 SCHRITTE: dict[int, tuple[str, Callable[[Connection], None]]] = {}
 
 
@@ -56,6 +56,38 @@ def index_neu(c: Connection, tabelle: str, name: str, *spalten: str, unique: boo
 def spalte_weg(c: Connection, tabelle: str, spalte: str) -> None:
     if spalte in {x["name"] for x in inspect(c).get_columns(tabelle)}:
         c.execute(text(f"ALTER TABLE {tabelle} DROP COLUMN {spalte}"))
+
+
+# ------------------------------------------------------------------ Schritte
+def _v2(c: Connection) -> None:
+    """Kataloge: Gerätetypen (mehrere je Gerät), Hersteller, Modelle."""
+    from sqlalchemy.orm import Session
+    import katalog
+    from modelle import Einstellung, Geraet, GeraetTyp, Hersteller, Modell, Typ
+    for t in (Typ, GeraetTyp, Hersteller, Modell):
+        t.__table__.create(c, checkfirst=True)
+    s = Session(bind=c)
+    if s.scalar(select(Typ.id).limit(1)) is None:
+        katalog.standard_typen_anlegen(s)
+        s.flush()
+    ids = {t.schluessel: t.id for t in s.scalars(select(Typ))}
+    for g in s.scalars(select(Geraet)):
+        if g.typ not in ids:
+            g.typ = "unbekannt"
+        if s.get(GeraetTyp, (g.id, ids[g.typ])) is None:
+            s.add(GeraetTyp(geraet_id=g.id, typ_id=ids[g.typ]))
+    s.flush()
+    for g in s.scalars(select(Geraet).where(Geraet.status == "aktiv", Geraet.hersteller != "")):
+        katalog.eintragen(s, g.hersteller, g.modell, g.typ)
+    # Neu gefundene Geräte kommen nicht mehr direkt ins Inventar
+    e = s.get(Einstellung, "allgemein")
+    if e and isinstance(e.wert, dict) and e.wert.get("neue_geraete") == "anlegen":
+        e.wert = {**e.wert, "neue_geraete": "pruefen"}
+    s.flush()
+    s.close()
+
+
+SCHRITTE[2] = ("Kataloge: Gerätetypen, Hersteller, Modelle", _v2)
 
 
 # ------------------------------------------------------------------ Ablauf
@@ -124,9 +156,13 @@ def schema_info() -> dict:
 def _standard_daten(engine) -> None:
     """Füllt leere Tabellen mit Vorgaben (z. B. Erkennungs-Muster). Läuft bei jedem Start, ändert nie Vorhandenes."""
     from sqlalchemy.orm import Session
-    from modelle import Muster
+    from modelle import Muster, Typ
+    import katalog
     import muster
     with Session(engine) as s:
+        if s.scalar(select(Typ.id).limit(1)) is None:
+            katalog.standard_typen_anlegen(s)
+            s.commit()
         if s.scalar(select(Muster.id).limit(1)) is None:
             for m in muster.STANDARD:
                 s.add(Muster(**m))

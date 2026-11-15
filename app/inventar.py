@@ -12,16 +12,17 @@ import kern
 import netz
 import opnsense
 from kern import iso, jetzt, protokoll, sitzung
-from modelle import Agent, Ereignis, Geraet, Netzwerk, Schnittstelle
+import katalog
+from modelle import Agent, Ereignis, Geraet, GeraetTyp, Netzwerk, Schnittstelle, Typ
 from zugang import ADMIN, LESER, OPERATOR, client_ip
 
 router = APIRouter(prefix="/api")
 
-TYPEN = [("pc", "PC"), ("laptop", "Laptop"), ("server", "Server"), ("vm", "Virtuelle Maschine"), ("nas", "NAS"),
-         ("netzwerk", "Switch / Access-Point"), ("router", "Router / Firewall"), ("drucker", "Drucker"),
-         ("telefon", "Telefon / Smartphone"), ("tablet", "Tablet"), ("tv", "TV / Medien"), ("kamera", "Kamera"),
-         ("iot", "IoT / Smart Home"), ("konsole", "Spielkonsole"), ("sonstiges", "Sonstiges"), ("unbekannt", "Unbekannt")]
-TYP_NAMEN = dict(TYPEN)
+
+
+def typnamen(s) -> dict[str, str]:
+    return {t.schluessel: t.name for t in s.scalars(select(Typ))}
+
 STATUS = ("aktiv", "neu", "ignoriert", "ausgemustert")
 
 STANDARD_ALLGEMEIN = {"name": "NINA", "neue_geraete": "pruefen", "ueberwachen_intervall": 60,
@@ -31,7 +32,10 @@ _scan_lock: dict[int, threading.Lock] = {}
 
 
 def allgemein() -> dict:
-    return {**STANDARD_ALLGEMEIN, **(kern.einstellung("allgemein", {}) or {})}
+    a = {**STANDARD_ALLGEMEIN, **(kern.einstellung("allgemein", {}) or {})}
+    if a.get("neue_geraete") not in ("pruefen", "nein"):     # „direkt ins Inventar“ gibt es nicht mehr
+        a["neue_geraete"] = "pruefen"
+    return a
 
 
 # ------------------------------------------------------------------ Typ raten
@@ -154,11 +158,12 @@ def einspielen(hosts: list[dict], quelle: str, netzwerk_id: int | None = None, o
             if modus == "nein" or not h.get("online", True):
                 continue
             hersteller = h.get("hersteller") or netz.mac_hersteller(mac)
-            g = Geraet(name=kurzname(hn) or ip or mac, typ=typ_raten(hersteller, hn, mac),
+            g = Geraet(name=kurzname(hn) or ip or mac, typ=katalog.gueltiger_typ(s, typ_raten(hersteller, hn, mac)),
                        hersteller="" if "zufällig" in hersteller else hersteller.split(" ")[0][:128],
-                       status="neu" if modus == "pruefen" else "aktiv", quelle=quelle, online=True, zuletzt_online=jetzt())
+                       status="neu", quelle=quelle, online=True, zuletzt_online=jetzt())
             s.add(g)
             s.flush()
+            katalog.geraet_typen_setzen(s, g, [])
             sch = Schnittstelle(geraet_id=g.id, mac=mac, ip=ip, hostname=hn, mac_hersteller=hersteller,
                                 netzwerk_id=nw.id if nw else None, primaer=True, quelle=quelle, online=True, zuletzt=jetzt())
             s.add(sch)
@@ -342,21 +347,26 @@ def _sch_json(x: Schnittstelle, netze: dict) -> dict:
             "feste_ip": x.feste_ip, "quelle": x.quelle, "online": x.online, "erstmals": iso(x.erstmals), "zuletzt": iso(x.zuletzt)}
 
 
-def geraet_json(s, g: Geraet, detail: bool = False, netze: dict | None = None, agenten: dict | None = None) -> dict:
+def geraet_json(s, g: Geraet, detail: bool = False, netze: dict | None = None, agenten: dict | None = None,
+                tnamen: dict | None = None, gtypen: dict | None = None) -> dict:
     import agent as agent_mod
+    if tnamen is None:
+        tnamen = typnamen(s)
+    typen = (gtypen.get(g.id) if gtypen is not None else katalog.geraet_typen(s, g.id)) or [g.typ]
     if netze is None:
         netze = {n.id: n.name for n in s.scalars(select(Netzwerk))}
     schs = sorted(s.scalars(select(Schnittstelle).where(Schnittstelle.geraet_id == g.id)),
                   key=lambda x: (not x.primaer, not x.online, x.id))
     p = schs[0] if schs else None
     ag = agenten.get(g.id) if agenten is not None else s.scalars(select(Agent).where(Agent.geraet_id == g.id)).first()
-    d = {"id": g.id, "name": g.name, "typ": g.typ, "typ_name": TYP_NAMEN.get(g.typ, g.typ), "hersteller": g.hersteller,
+    d = {"id": g.id, "name": g.name, "typ": g.typ, "typ_name": tnamen.get(g.typ, g.typ), "typen": typen,
+         "typ_namen": [tnamen.get(k, k) for k in typen], "hersteller": g.hersteller,
          "modell": g.modell, "benutzer": g.benutzer, "raum": g.raum, "standort": g.standort, "status": g.status,
          "quelle": g.quelle, "online": g.online, "zuletzt_online": iso(g.zuletzt_online), "tags": g.tags or [],
          "ip": p.ip if p else "", "mac": next((x.mac for x in schs if x.mac), ""), "hostname": p.hostname if p else "",
          "netzwerk": netze.get(p.netzwerk_id, "") if p else "", "anzahl_schnittstellen": len(schs),
          "wol": bool(g.wol_aktiv and any(x.mac for x in schs)), "ueberwachen": g.ueberwachen, "ha_import": g.ha_import,
-         "agent": {"id": ag.id, "name": ag.name, "online": ag.online} if ag else None,
+         "agent": {"id": ag.id, "name": ag.name, "online": ag.online} if ag else None, "quelle_scan": any(x.quelle != "manuell" for x in schs),
          "angemeldet": agent_mod.angemeldet(ag.id) if ag else "", "geaendert": iso(g.geaendert)}
     if detail:
         sch_nw = s.get(Netzwerk, p.netzwerk_id) if p and p.netzwerk_id else None
@@ -377,7 +387,9 @@ def geraet_json(s, g: Geraet, detail: bool = False, netze: dict | None = None, a
 @router.get("/meta")
 def meta(ich: dict = Depends(LESER)):
     a = allgemein()
-    return {"typen": TYPEN, "status": STATUS, "name": a["name"], "zusatzfelder": a.get("zusatzfelder") or [],
+    with sitzung() as s:
+        typen = [[t.schluessel, t.name, t.symbol, t.icon] for t in katalog.typen(s)]
+    return {"typen": typen, "status": STATUS, "name": a["name"], "zusatzfelder": a.get("zusatzfelder") or [],
             "version": kern.VERSION, "nmap": netz.nmap_da(), "opnsense": opnsense.eingerichtet()}
 
 
@@ -386,7 +398,10 @@ def uebersicht(ich: dict = Depends(LESER)):
     with sitzung() as s:
         def zahl(*w):
             return s.scalar(select(func.count(Geraet.id)).where(*w)) or 0
-        typen = dict(s.execute(select(Geraet.typ, func.count(Geraet.id)).where(Geraet.status == "aktiv").group_by(Geraet.typ)).all())
+        tn = typnamen(s)
+        typen = dict(s.execute(select(Typ.schluessel, func.count(GeraetTyp.geraet_id)).join(GeraetTyp, GeraetTyp.typ_id == Typ.id)
+                               .join(Geraet, Geraet.id == GeraetTyp.geraet_id).where(Geraet.status == "aktiv")
+                               .group_by(Typ.schluessel)).all())
         ev = s.execute(select(Ereignis, Geraet.name).outerjoin(Geraet, Geraet.id == Ereignis.geraet_id)
                        .order_by(Ereignis.zeit.desc()).limit(25)).all()
         netze = [{"id": n.id, "name": n.name, "cidr": n.cidr, "letzter_scan": iso(n.letzter_scan), "scan_status": n.scan_status,
@@ -398,7 +413,7 @@ def uebersicht(ich: dict = Depends(LESER)):
                 "neu": zahl(Geraet.status == "neu"), "ignoriert": zahl(Geraet.status == "ignoriert"),
                 "agenten": s.scalar(select(func.count(Agent.id))) or 0,
                 "agenten_online": s.scalar(select(func.count(Agent.id)).where(Agent.online.is_(True))) or 0,
-                "typen": [{"typ": k, "name": TYP_NAMEN.get(k, k), "anzahl": v} for k, v in sorted(typen.items(), key=lambda x: -x[1])],
+                "typen": [{"typ": k, "name": tn.get(k, k), "anzahl": v} for k, v in sorted(typen.items(), key=lambda x: -x[1])],
                 "netze": netze,
                 "ereignisse": [{"zeit": iso(e.zeit), "art": e.art, "text": e.text, "geraet_id": e.geraet_id, "geraet": n or ""} for e, n in ev]}
 
@@ -411,7 +426,8 @@ def geraete_liste(s, status: str = "aktiv", nur_ha: bool = False) -> list[dict]:
         q = q.where(Geraet.status == status)
     if nur_ha:
         q = q.where(Geraet.ha_import.is_(True))
-    return [geraet_json(s, g, netze=netze, agenten=agenten) for g in s.scalars(q)]
+    tn, gt = typnamen(s), katalog.alle_geraet_typen(s)
+    return [geraet_json(s, g, netze=netze, agenten=agenten, tnamen=tn, gtypen=gt) for g in s.scalars(q)]
 
 
 @router.get("/geraete")
@@ -440,8 +456,6 @@ async def geraet_speichern(req: Request, ich: dict = Depends(OPERATOR)):
     name = str(d.get("name", "")).strip()
     if not name:
         raise HTTPException(400, "Name fehlt")
-    if d.get("typ") and d["typ"] not in TYP_NAMEN:
-        raise HTTPException(400, "Unbekannter Typ")
     if d.get("status") and d["status"] not in STATUS:
         raise HTTPException(400, "Unbekannter Status")
     if d.get("raum") and not re.fullmatch(r"[a-z0-9_]{1,32}", d["raum"]):
@@ -454,6 +468,8 @@ async def geraet_speichern(req: Request, ich: dict = Depends(OPERATOR)):
         else:
             g = Geraet(quelle="manuell", status="aktiv")
             s.add(g)
+        if d.get("typ") and not s.scalar(select(Typ.id).where(Typ.schluessel == d["typ"])):
+            raise HTTPException(400, "Unbekannter Typ")
         for f in FELDER:
             if f in d and d[f] is not None:
                 setattr(g, f, str(d[f]).strip())
@@ -466,6 +482,10 @@ async def geraet_speichern(req: Request, ich: dict = Depends(OPERATOR)):
             g.extra = {**(g.extra or {}), **d["extra"]}
         g.geaendert = jetzt()
         s.flush()
+        if "typen" in d or not d.get("id"):
+            katalog.geraet_typen_setzen(s, g, d.get("typen") or [])
+        if g.status == "aktiv":
+            katalog.eintragen(s, g.hersteller, g.modell, g.typ)
         neu = not d.get("id")
         if neu and (d.get("mac") or d.get("ip")):
             mac = netz.mac_norm(d.get("mac"))
@@ -517,13 +537,98 @@ async def geraet_status(gid: int, req: Request, ich: dict = Depends(OPERATOR)):
         g = s.get(Geraet, gid)
         if not g:
             raise LookupError("Gerät gibt es nicht")
+        if d.get("typ") and not s.scalar(select(Typ.id).where(Typ.schluessel == d["typ"])):
+            raise HTTPException(400, "Unbekannter Typ")
         g.status, g.geaendert = d["status"], jetzt()
-        for f in ("name", "typ", "benutzer", "raum"):
-            if d.get(f):
+        for f in ("name", "typ", "benutzer", "raum", "hersteller", "modell", "standort"):
+            if d.get(f) is not None and (d.get(f) or f in ("hersteller", "modell", "benutzer", "raum", "standort")):
                 setattr(g, f, str(d[f]).strip())
+        weg = []
+        for qid in d.get("zusammen") or []:          # ausgewählte Funde in dieses Gerät übernehmen
+            qid = int(qid)
+            if qid != gid and s.get(Geraet, qid):
+                weg.append(_zusammen(s, qid, gid))
+        if "typen" in d or d.get("typ"):
+            katalog.geraet_typen_setzen(s, g, d.get("typen") or [])
+        if g.status == "aktiv":
+            katalog.eintragen(s, g.hersteller, g.modell, g.typ)
+            for a in s.scalars(select(Agent).where(Agent.geraet_id == gid)):
+                g.ueberwachen = True
+        s.flush()
+        online_aktualisieren(s, [gid])
         name = g.name
-    protokoll(ich["name"], "geraet", f"Status {d['status']}", name, ip=client_ip(req))
+    protokoll(ich["name"], "geraet", f"Status {d['status']}", name, details=("zusammengeführt: " + ", ".join(weg)) if weg else "",
+              ip=client_ip(req))
     return {"ok": True}
+
+
+def _zusammen(s, quelle: int, ziel: int) -> str:
+    """Schnittstellen, Agent und Ereignisse von Gerät quelle zum Ziel verschieben, quelle löschen."""
+    g = s.get(Geraet, quelle)
+    z = s.get(Geraet, ziel)
+    for x in s.scalars(select(Schnittstelle).where(Schnittstelle.geraet_id == quelle)):
+        x.geraet_id, x.primaer = ziel, False
+    for a in s.scalars(select(Agent).where(Agent.geraet_id == quelle)):
+        a.geraet_id = ziel
+    for e in s.scalars(select(Ereignis).where(Ereignis.geraet_id == quelle)):
+        e.geraet_id = ziel
+    # leere Angaben am Ziel aus dem Fund ergänzen
+    for f in ("hersteller", "modell", "betriebssystem", "seriennummer", "benutzer"):
+        if not getattr(z, f) and getattr(g, f):
+            setattr(z, f, getattr(g, f))
+    if g.wol_aktiv:
+        z.wol_aktiv = True
+    if g.ueberwachen:
+        z.ueberwachen = True
+    weitere = katalog.geraet_typen(s, quelle)
+    ereignis(s, ziel, "neu", f"zusammengeführt mit „{g.name}“")
+    name = g.name
+    s.delete(g)
+    s.flush()
+    katalog.geraet_typen_setzen(s, z, katalog.geraet_typen(s, ziel) + [k for k in weitere if k != "unbekannt"])
+    return name
+
+
+@router.get("/geraete/{gid}/vorschlaege")
+def vorschlaege(gid: int, ich: dict = Depends(LESER)):
+    """Andere Funde (neu) und Inventar-Geräte, die wahrscheinlich dasselbe Gerät sind – mit Grund."""
+    with sitzung() as s:
+        g = s.get(Geraet, gid)
+        if not g:
+            raise LookupError("Gerät gibt es nicht")
+        schs = list(s.scalars(select(Schnittstelle).where(Schnittstelle.geraet_id == gid)))
+        namen = {kurzname(g.name).lower()} | {kurzname(x.hostname).lower() for x in schs if x.hostname}
+        namen.discard("")
+        ips = {x.ip for x in schs if x.ip}
+        macs = {x.mac for x in schs if x.mac}
+        ag = s.scalars(select(Agent).where(Agent.geraet_id == gid)).first()
+        if ag:
+            namen.add(ag.name.lower())
+            import agent as agent_mod
+            ips |= agent_mod.agent_ips(ag.id)
+        tn, gt = typnamen(s), katalog.alle_geraet_typen(s)
+        out = []
+        for o in s.scalars(select(Geraet).where(Geraet.id != gid, Geraet.status.in_(("neu", "aktiv")))):
+            oschs = list(s.scalars(select(Schnittstelle).where(Schnittstelle.geraet_id == o.id)))
+            onamen = {kurzname(o.name).lower()} | {kurzname(x.hostname).lower() for x in oschs if x.hostname}
+            oag = s.scalars(select(Agent).where(Agent.geraet_id == o.id)).first()
+            if oag:
+                onamen.add(oag.name.lower())
+            gruende = []
+            if namen & onamen:
+                gruende.append("gleicher Name")
+            if macs & {x.mac for x in oschs if x.mac}:
+                gruende.append("gleiche MAC")
+            if ips & {x.ip for x in oschs if x.ip}:
+                gruende.append("gleiche IP")
+            if not gruende and o.status != "neu":
+                continue
+            j = geraet_json(s, o, tnamen=tn, gtypen=gt)
+            j["gruende"] = gruende
+            j["agent_name"] = oag.name if oag else ""
+            out.append(j)
+        out.sort(key=lambda x: (-len(x["gruende"]), x["status"] != "neu", x["name"].lower()))
+        return {"vorschlaege": out}
 
 
 @router.post("/geraete/{gid}/zusammenfuehren")
@@ -534,19 +639,9 @@ async def zusammenfuehren(gid: int, req: Request, ich: dict = Depends(OPERATOR))
     if not ziel or ziel == gid:
         raise HTTPException(400, "Ziel-Gerät wählen")
     with sitzung() as s:
-        g, z = s.get(Geraet, gid), s.get(Geraet, ziel)
-        if not g or not z:
+        if not s.get(Geraet, gid) or not s.get(Geraet, ziel):
             raise LookupError("Gerät gibt es nicht")
-        for x in s.scalars(select(Schnittstelle).where(Schnittstelle.geraet_id == gid)):
-            x.geraet_id, x.primaer = ziel, False
-        for a in s.scalars(select(Agent).where(Agent.geraet_id == gid)):
-            a.geraet_id = ziel
-        for e in s.scalars(select(Ereignis).where(Ereignis.geraet_id == gid)):
-            e.geraet_id = ziel
-        ereignis(s, ziel, "neu", f"zusammengeführt mit „{g.name}“")
-        name = g.name
-        s.delete(g)
-        s.flush()
+        name = _zusammen(s, gid, ziel)
         online_aktualisieren(s, [ziel])
     protokoll(ich["name"], "geraet", "zusammengeführt", f"{name} → {ziel}", ip=client_ip(req))
     return {"ok": True, "ziel": ziel}

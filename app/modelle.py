@@ -220,3 +220,42 @@ class Ereignis(Basis):
     geraet_id: Mapped[int | None] = mapped_column(ForeignKey("ni_geraet.id", ondelete="CASCADE"), nullable=True, index=True)
     art: Mapped[str] = mapped_column(String(24), default="")    # neu | online | offline | ip | wol | befehl | agent
     text: Mapped[str] = mapped_column(String(512), default="")
+
+
+# ------------------------------------------------------------------ ab Schema 2: Kataloge
+class Typ(Basis):
+    """Gerätetyp (Katalog, in der Oberfläche pflegbar). Ein Gerät kann mehrere Typen haben."""
+    __tablename__ = "ni_typ"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    schluessel: Mapped[str] = mapped_column(String(32), unique=True)    # z. B. server, vm (auch für Home Assistant)
+    name: Mapped[str] = mapped_column(String(64))
+    symbol: Mapped[str] = mapped_column(String(16), default="")         # Zeichen/Emoji in der Oberfläche
+    icon: Mapped[str] = mapped_column(String(64), default="")           # mdi-Symbol für Home Assistant
+    reihenfolge: Mapped[int] = mapped_column(Integer, default=100)
+    system: Mapped[bool] = mapped_column(Boolean, default=False)        # nicht löschbar (unbekannt)
+
+
+class GeraetTyp(Basis):
+    __tablename__ = "ni_geraet_typ"
+    geraet_id: Mapped[int] = mapped_column(ForeignKey("ni_geraet.id", ondelete="CASCADE"), primary_key=True)
+    typ_id: Mapped[int] = mapped_column(ForeignKey("ni_typ.id", ondelete="CASCADE"), primary_key=True)
+
+
+class Hersteller(Basis):
+    __tablename__ = "ni_hersteller"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), unique=True)
+    webseite: Mapped[str] = mapped_column(String(255), default="")
+    notizen: Mapped[str] = mapped_column(Text, default="")
+    erstellt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=jetzt)
+
+
+class Modell(Basis):
+    __tablename__ = "ni_modell"
+    __table_args__ = (UniqueConstraint("hersteller_id", "name", name="uq_modell"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    hersteller_id: Mapped[int] = mapped_column(ForeignKey("ni_hersteller.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(128))
+    typ_id: Mapped[int | None] = mapped_column(ForeignKey("ni_typ.id", ondelete="SET NULL"), nullable=True)
+    notizen: Mapped[str] = mapped_column(Text, default="")
+    erstellt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=jetzt)

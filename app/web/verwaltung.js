@@ -17,9 +17,12 @@ ANSICHT.agenten = { titel: "HASS.Agent", async zeigen(main) {
           { t: "Name", w: a => h("div", { class: "zwei-zeilen" }, h("b", {}, a.name), h("small", {}, a.kennung)) },
           { t: "Version", w: a => a.version }, { t: "System", w: a => a.modell },
           { t: "Werte / Befehle", w: a => `${a.werte} / ${a.befehle}`, z: 1 },
-          { t: "Gerät", w: a => a.geraet_id ? h("a", { href: `#geraet?id=${a.geraet_id}` }, a.geraet) : marke("nicht verknüpft", "warn") },
+          { t: "Gerät", w: a => a.geraet_id ? h("span", {}, h("a", { href: `#geraet?id=${a.geraet_id}` }, a.geraet), " ", a.geraet_status === "neu" ? marke("neu", "warn") : null)
+              : marke("nicht verknüpft", "warn") },
           { t: "Zuletzt", w: a => vorZeit(a.zuletzt) },
-          { t: "", w: a => darf("admin") ? h("div", { class: "knopfreihe" }, h("button", { class: "klein", onclick: () => verknuepfenDialog(a).then(r => r && laden()) }, "Verknüpfen"),
+          { t: "", w: a => darf("admin") ? h("div", { class: "knopfreihe" },
+            a.geraet_status === "neu" ? h("button", { class: "klein p", onclick: async () => { const g = await api("GET", `/api/geraete/${a.geraet_id}`); if (await uebernehmenDialog(g)) laden(); } }, "Übernehmen") : null,
+            h("button", { class: "klein", onclick: () => verknuepfenDialog(a).then(r => r && laden()) }, "Verknüpfen"),
             h("button", { class: "klein gefahr", onclick: async () => { if (await bestaetigen(`Agent „${a.name}“ entfernen? Meldet er sich wieder, taucht er neu auf.`, "Entfernen")) { await versuch(() => api("DELETE", `/api/agenten/${a.id}`), "Entfernt"); laden(); } } }, "Entfernen")) : null },
         ], d.agenten, { leer: "Noch kein HASS.Agent gefunden.", klick: a => a.geraet_id && (location.hash = `#geraet?id=${a.geraet_id}`) })));
   };
@@ -114,11 +117,11 @@ function allgemeinTab(a) {
   const f = h("div", {},
     h("div", { class: "raster" },
       feld("Name dieser Installation", eingabe("name", a.name), "erscheint in Home Assistant"),
-      feld("Neu gefundene Geräte", auswahl("neue_geraete", [["pruefen", "Unter „Neu gefunden“ zum Prüfen"], ["anlegen", "Direkt ins Inventar"], ["nein", "Nicht anlegen (nur Bekannte aktualisieren)"]], a.neue_geraete)),
+      feld("Neu gefundene Geräte", auswahl("neue_geraete", [["pruefen", "Unter „Neu gefunden“ zum Prüfen"], ["nein", "Nicht anlegen (nur Bekannte aktualisieren)"]], a.neue_geraete), "Ins Inventar kommt ein Gerät nur, wenn es übernommen wird"),
       feld("Überwachte Geräte anpingen alle … s", eingabe("ueberwachen_intervall", a.ueberwachen_intervall, { type: "number", min: 15 })),
       feld("WoL-Port", auswahl("wol_port", [["9", "9 (Standard)"], ["7", "7"]], a.wol_port)),
       feld("Ereignisse aufheben (Tage)", eingabe("ereignisse_tage", a.ereignisse_tage, { type: "number", min: 7 }))),
-    haken("Für neue HASS.Agents automatisch ein Gerät anlegen", a.agent_geraete_anlegen, "Sonst nur verknüpfen, wenn ein Gerät mit gleichem Namen existiert", "agent_geraete_anlegen").el);
+    haken("Neue HASS.Agents unter „Neu gefunden“ aufführen", a.agent_geraete_anlegen, "Sonst nur verknüpfen, wenn ein Gerät mit gleichem Namen im Inventar ist", "agent_geraete_anlegen").el);
   return h("div", {}, h("div", { class: "karte" }, h("h2", {}, "Allgemein"), f),
     h("div", { class: "karte" }, h("h2", {}, "Zusatzfelder für Geräte"), h("p", { class: "leise klein-t" }, "Eigene Angaben je Gerät (z. B. Garantie bis, Kostenstelle, Lieferant) – ohne Datenbank-Umbau, gespeichert im Feld „extra“ und auch an Home Assistant übergeben."), zf),
     h("div", { class: "leiste" }, h("span", { class: "rechts" }, h("button", { class: "p", onclick: async () => {
@@ -178,7 +181,7 @@ function sicherungTab(s) {
         .map(([k, v]) => [h("dt", {}, k), h("dd", {}, v)])),
       h("p", { class: "leise klein-t" }, "Beim Start eines neueren Containers wird das Schema automatisch hochgezogen (SQLite wird vorher als <datei>.vor-v<alt> kopiert). Ein älteres Image startet nicht mit einer neueren Datenbank – so geht nichts kaputt.")),
     h("div", { class: "karte" }, h("h2", {}, "Sicherung"),
-      h("p", { class: "leise klein-t" }, "Export: Netzwerke, Geräte, Schnittstellen, Erkennungs-Muster und allgemeine Einstellungen als JSON. Zugangsdaten (MQTT, OPNsense), Benutzer und API-Schlüssel sind nicht enthalten."),
+      h("p", { class: "leise klein-t" }, "Export: Kataloge (Typen, Hersteller, Modelle), Netzwerke, Geräte, Schnittstellen, Erkennungs-Muster und allgemeine Einstellungen als JSON. Zugangsdaten (MQTT, OPNsense), Benutzer und API-Schlüssel sind nicht enthalten."),
       h("div", { class: "knopfreihe" },
         h("button", { class: "p", onclick: async () => {
           const r = await versuch(() => api("GET", "/api/sicherung", undefined, { roh: true }));
@@ -188,7 +191,7 @@ function sicherungTab(s) {
       h("h4", {}, "Wiederherstellen"), h("div", { class: "leiste" }, datei, h("button", { class: "gefahr", onclick: async () => {
         if (!datei.files[0]) return hinweis("Erst eine Datei wählen", true);
         let d; try { d = JSON.parse(await datei.files[0].text()); } catch { return hinweis("Keine gültige JSON-Datei", true); }
-        if (!(await bestaetigen(`Alle Netzwerke, Geräte, Schnittstellen und Muster durch die Sicherung vom ${datum(d.erstellt)} ersetzen?`, "Ersetzen"))) return;
+        if (!(await bestaetigen(`Kataloge, Netzwerke, Geräte, Schnittstellen und Muster durch die Sicherung vom ${datum(d.erstellt)} ersetzen?`, "Ersetzen"))) return;
         const r = await versuch(() => api("POST", "/api/sicherung", d));
         hinweis(`Wiederhergestellt: ${r.geraete} Geräte, ${r.netzwerke} Netzwerke`);
       } }, "Einspielen"))));

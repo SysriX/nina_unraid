@@ -121,7 +121,8 @@ class Dienst:
         self.empfangen = 0
         self._re = None
         self.net10: dict[str, dict] = {}         # serial -> {aid, app, dienst, schluessel}
-        self.net10_warte: dict[str, dict] = {}   # serial -> {topic: payload} bis das Gerät bekannt ist
+        self.net10_warte: dict[str, dict] = {}
+        self.ips: dict[int, set] = {}            # Agent -> gemeldete IP-Adressen   # serial -> {topic: payload} bis das Gerät bekannt ist
 
     # -------------------------------------------------------------- Start/Stopp
     def start(self):
@@ -537,6 +538,7 @@ class Dienst:
         ips = [x.get("address") for x in attrs.get("addresses") or [] if isinstance(x, dict) and x.get("address")]
         if not ips:
             return
+        self.ips[aid] = set(ips)
         try:
             with sitzung() as s:
                 a = s.get(Agent, aid)
@@ -546,7 +548,8 @@ class Dienst:
                     if sch.geraet_id == a.geraet_id:
                         continue
                     alt = s.get(Geraet, sch.geraet_id)
-                    if alt and alt.status == "neu":
+                    ziel = s.get(Geraet, a.geraet_id)
+                    if alt and alt.status == "neu" and ziel and ziel.status == "aktiv":
                         sch.geraet_id, sch.primaer = a.geraet_id, False
                         s.flush()
                         if not s.scalar(select(func.count(Schnittstelle.id)).where(Schnittstelle.geraet_id == alt.id)):
@@ -576,22 +579,24 @@ class Dienst:
         import inventar
         if a.geraet_id and s.get(Geraet, a.geraet_id):
             return
+        import katalog
         n = a.name.lower()
-        g = s.scalars(select(Geraet).where(func.lower(Geraet.name) == n, Geraet.status != "ausgemustert")).first()
+        # nur Geräte, die schon im Inventar sind; neue Funde führt der Benutzer beim Übernehmen zusammen
+        g = s.scalars(select(Geraet).where(func.lower(Geraet.name) == n, Geraet.status == "aktiv")).first()
         if not g:
-            sch = s.scalars(select(Schnittstelle).where(or_(func.lower(Schnittstelle.hostname) == n,
-                                                            func.lower(Schnittstelle.hostname).like(n + ".%")))).first()
+            sch = s.scalars(select(Schnittstelle).join(Geraet, Geraet.id == Schnittstelle.geraet_id).where(
+                Geraet.status == "aktiv", or_(func.lower(Schnittstelle.hostname) == n,
+                                              func.lower(Schnittstelle.hostname).like(n + ".%")))).first()
             g = s.get(Geraet, sch.geraet_id) if sch else None
         if not g and inventar.allgemein().get("agent_geraete_anlegen", True):
-            g = Geraet(name=a.name, typ="pc", quelle="agent", status="aktiv", betriebssystem=a.modell[:128])
+            g = Geraet(name=a.name, typ=katalog.gueltiger_typ(s, "pc"), quelle="agent", status="neu", betriebssystem=a.modell[:128])
             s.add(g)
             s.flush()
-            inventar.ereignis(s, g.id, "neu", "von HASS.Agent angelegt")
+            katalog.geraet_typen_setzen(s, g, [])
+            inventar.ereignis(s, g.id, "neu", "von HASS.Agent gefunden")
         if g:
             a.geraet_id = g.id
             g.ueberwachen = True          # PC: schnell merken, wenn er aus- oder angeht
-            if g.status == "neu":
-                g.status = "aktiv"
             if not g.betriebssystem and a.modell:
                 g.betriebssystem = a.modell[:128]
 
@@ -612,6 +617,8 @@ class Dienst:
                             break
                 if mac:
                     paare.append((mac, ip, str(x.get("Name") or x.get("name") or x.get("Description") or "")[:64]))
+                    if ip:
+                        self.ips.setdefault(aid, set()).add(ip)
                 for v in x.values():
                     gehen(v)
             elif isinstance(x, list):
@@ -632,7 +639,9 @@ class Dienst:
                     sch = s.scalars(select(Schnittstelle).where(Schnittstelle.mac == mac)).first()
                     if sch and sch.geraet_id != gid:
                         alt = s.get(Geraet, sch.geraet_id)
-                        if alt and alt.status == "neu":     # vom Scan doppelt gefunden → übernehmen
+                        ziel = s.get(Geraet, gid)
+                        # vom Scan doppelt gefunden → nur übernehmen, wenn das Agent-Gerät schon im Inventar ist
+                        if alt and alt.status == "neu" and ziel and ziel.status == "aktiv":
                             sch.geraet_id, sch.primaer = gid, False
                             s.flush()
                             if not s.scalar(select(func.count(Schnittstelle.id)).where(Schnittstelle.geraet_id == alt.id)):
@@ -705,6 +714,22 @@ class Dienst:
 DIENST = Dienst()
 
 
+def agent_ips(aid: int) -> set:
+    """IP-Adressen, die der Agent gemeldet hat (Netzwerk-Sensoren)."""
+    out = set(DIENST.ips.get(aid, set()))
+    try:
+        with sitzung() as s:
+            for w in s.scalars(select(AgentWert).where(AgentWert.agent_id == aid)):
+                for x in (w.attribute or {}).get("addresses") or []:
+                    if isinstance(x, dict) and x.get("address"):
+                        out.add(x["address"])
+                if w.schluessel == "network_address" and netz.ip_gueltig(w.wert or ""):
+                    out.add(w.wert)
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
 def angemeldet(aid: int) -> str:
     """Wert des Sensors, der als „benutzer“ erkannt wird (z. B. LoggedUser)."""
     try:
@@ -733,6 +758,7 @@ def agent_json(s, a: Agent, voll: bool = False) -> dict:
          "online": a.online, "zuletzt": iso(a.zuletzt), "geraet_id": a.geraet_id, "erstellt": iso(a.erstellt)}
     g = s.get(Geraet, a.geraet_id) if a.geraet_id else None
     d["geraet"] = g.name if g else ""
+    d["geraet_status"] = g.status if g else ""
     if not voll:
         d["werte"] = s.scalar(select(func.count(AgentWert.id)).where(AgentWert.agent_id == a.id)) or 0
         d["befehle"] = s.scalar(select(func.count(AgentBefehl.id)).where(AgentBefehl.agent_id == a.id)) or 0
@@ -849,9 +875,11 @@ async def agent_verknuepfen(aid: int, req: Request, ich: dict = Depends(ADMIN)):
             raise LookupError("Agent gibt es nicht")
         alt = a.geraet_id
         if d.get("neu"):
-            g = Geraet(name=a.name, typ="pc", quelle="agent", status="aktiv", betriebssystem=a.modell[:128])
+            import katalog
+            g = Geraet(name=a.name, typ=katalog.gueltiger_typ(s, "pc"), quelle="agent", status="neu", betriebssystem=a.modell[:128])
             s.add(g)
             s.flush()
+            katalog.geraet_typen_setzen(s, g, [])
             a.geraet_id = g.id
         else:
             gid = int(d.get("geraet_id") or 0) or None
