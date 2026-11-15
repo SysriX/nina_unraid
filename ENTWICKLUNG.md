@@ -53,6 +53,16 @@ NINA_DATA=./daten NINA_PORT=18095 NINA_SETUP_TOKEN=TEST-TEST-TEST python app/mai
 ```
 Ohne nmap scannt NINA per Ping (bis /22).
 
+## Icon-Liste (mdi)
+
+`app/web/mdi.json` (Name, Pfad, Aliasse, Kategorien) wird aus dem npm-Paket @mdi/svg erzeugt:
+
+```bash
+npm pack @mdi/svg@7.4.47 && tar -xzf mdi-svg-7.4.47.tgz
+node werkzeuge/mdi-liste.js package app/web/mdi.json
+```
+Deutsche Suchbegriffe stehen in `app/web/icons.js` (`MDI_DE`), die Zeichen/Emoji-Auswahl in `ZEICHEN`.
+
 ## Logo und Symbol
 
 `werkzeuge/nina-logo.js` erzeugt `app/web/logo*.svg` (das dort erzeugte Schild-Icon wird nicht verwendet), `werkzeuge/nina-icon.js` das Icon (`icon-d.svg` eingesetzt: n als zentraler Knoten ohne Rahmen; a/b/c sind die Vorstufen) (Schrift **Dream MMA**, dafont, 100 % kostenlos, als Pfade; Aufbau wie MIRA, Akzent Blau). Braucht opentype.js und die TTF-Datei:

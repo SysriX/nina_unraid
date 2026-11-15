@@ -41,7 +41,7 @@ async function verknuepfenDialog(a) {
 
 // ------------------------------------------------------------------ Sensor-Erkennung
 ANSICHT.muster = { titel: "Sensor-Erkennung", async zeigen(main) {
-  const d = await api("GET", "/api/muster");
+  const [d] = await Promise.all([api("GET", "/api/muster"), mdiLaden().catch(() => {})]);
   const ziel = new URLSearchParams(location.hash.split("?")[1] || "").get("ziel") || "sensor";
   const liste = d.muster.filter(m => m.ziel === ziel);
   const bsp = d.beispiele.filter(b => b.ziel === ziel);
@@ -58,7 +58,7 @@ ANSICHT.muster = { titel: "Sensor-Erkennung", async zeigen(main) {
         { t: "Muster", w: m => h("span", { class: "mono" }, m.muster) },
         { t: "Bezeichnung", w: m => h("div", { class: "zwei-zeilen" }, m.bezeichnung || h("span", { class: "leise" }, "(Name des Sensors)"), m.kategorie ? h("small", {}, m.kategorie) : null) },
         ziel === "sensor" ? { t: "Einheit / Klasse", w: m => [m.einheit, m.device_class].filter(Boolean).join(" · ") } : { t: "Rückfrage", w: m => m.gefahr ? marke("ja", "warn") : "" },
-        { t: "Symbol", w: m => h("span", { class: "mono" }, m.icon) },
+        { t: "Symbol", w: m => h("span", { class: "status-zeile" }, mdiSvg(m.icon, 18), h("span", { class: "mono leise" }, m.icon)) },
         { t: "HA", w: m => m.importieren ? marke("ja", "ok") : marke("nein") },
         { t: "", w: m => m.aktiv ? "" : marke("aus") },
       ], liste, { klick: darf("admin") ? m => musterDialog(m) : null })),
@@ -81,7 +81,7 @@ async function musterDialog(m) {
       sensor ? feld("Einheit", eingabe("einheit", m.einheit, { placeholder: "%, °C, GB" })) : null,
       sensor ? feld("Geräteklasse (HA)", eingabe("device_class", m.device_class, { placeholder: "temperature, timestamp, battery …" })) : null,
       sensor ? feld("state_class (HA)", auswahl("state_class", ["", "measurement", "total", "total_increasing"], m.state_class)) : null,
-      feld("Symbol", eingabe("icon", m.icon, { placeholder: "mdi:cpu-64-bit" }))),
+      feld("Symbol (Home Assistant)", symbolFeld("icon", m.icon, "mdi"))),
     h("div", { class: "raster" },
       haken("An Home Assistant geben", m.importieren, null, "importieren").el,
       sensor ? null : haken("Vor dem Ausführen nachfragen", m.gefahr, null, "gefahr").el,

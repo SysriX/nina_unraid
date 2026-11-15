@@ -66,6 +66,7 @@ function typHerstellerFelder(w, kat) {
 ANSICHT.kataloge = { titel: "Kataloge", async zeigen(main, q) {
   const tab = q.get("tab") || "typen";
   const kat = await katalogLaden(true);
+  if (tab === "typen") await mdiLaden().catch(() => {});
   const inhalt = tab === "typen" ? typenTab(kat) : herstellerTab(kat);
   leeren(main, h("div", { class: "leiste" }, tabs([["typen", "Gerätetypen"], ["hersteller", "Hersteller & Modelle"]], tab, k => { location.hash = `#kataloge?tab=${k}`; })), inhalt);
 } };
@@ -80,7 +81,7 @@ function typenTab(kat) {
       { t: "", w: t => h("span", { class: "typ-symbol" }, t.symbol) },
       { t: "Name", w: t => h("b", {}, t.name) },
       { t: "Schlüssel", w: t => h("span", { class: "mono" }, t.schluessel) },
-      { t: "HA-Symbol", w: t => h("span", { class: "mono" }, t.icon) },
+      { t: "HA-Symbol", w: t => h("span", { class: "status-zeile" }, mdiSvg(t.icon, 20), h("span", { class: "mono leise" }, t.icon)) },
       { t: "Geräte", w: t => t.geraete, z: 1 },
       { t: "Reihenfolge", w: t => t.reihenfolge, z: 1 },
       { t: "", w: t => t.system ? marke("fest") : "" },
@@ -88,11 +89,12 @@ function typenTab(kat) {
 }
 
 async function typDialog(t = null) {
+  await mdiLaden().catch(() => {});
   const f = h("div", { class: "raster" },
     feld("Name *", eingabe("name", t?.name, { placeholder: "z. B. Hypervisor" })),
     t ? feld("Schlüssel", eingabe("", t.schluessel, { disabled: true }), "nicht änderbar") : feld("Schlüssel", eingabe("schluessel", "", { placeholder: "leer = aus dem Namen" }), "a–z, 0–9, _"),
-    feld("Symbol", eingabe("symbol", t?.symbol, { placeholder: "z. B. 🖥" }), "Zeichen oder Emoji für die Listen"),
-    feld("HA-Symbol", eingabe("icon", t?.icon, { placeholder: "mdi:server" })),
+    feld("Symbol in NINA", symbolFeld("symbol", t?.symbol, "zeichen"), "Zeichen oder Emoji für die Listen"),
+    feld("HA-Symbol", symbolFeld("icon", t?.icon, "mdi"), "Material Design Icon – wie in Home Assistant"),
     feld("Reihenfolge", eingabe("reihenfolge", t?.reihenfolge ?? 100, { type: "number" })));
   const kn = [["Abbrechen", null]];
   if (t && !t.system) kn.push(["Löschen", async () => {

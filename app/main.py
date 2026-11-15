@@ -5,6 +5,7 @@ import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -39,6 +40,9 @@ async def lebenszyklus(app):
 
 
 app = FastAPI(title="NINA", version=kern.VERSION, docs_url=None, redoc_url=None, openapi_url=None, lifespan=lebenszyklus)
+
+
+app.add_middleware(GZipMiddleware, minimum_size=2000)     # u. a. mdi.json (2,7 MB → ~0,8 MB)
 
 
 @app.middleware("http")

@@ -12,7 +12,9 @@ Home-Assistant-Integration: [nina_ha_integration](https://github.com/SysriX/nina
 ![Infokarte eines Rechners mit HASS.Agent und Wake-on-LAN](docs/images/geraet.png)
 *Beispieldaten*
 
-> **Stand 1.2.0:** Zeitplan (Einstellungen › Zeitplan) für Netzwerk-Scan, OPNsense-Abfrage und Agent-Abgleich: an/aus, Intervall, Zeitfenster (auch über Mitternacht) und Wochentage, Status mit letztem/nächstem Lauf und „Jetzt ausführen“. Kein neues Datenbank-Schema.
+> **Stand 1.3.0:** Symbol-Auswahl mit Suche für Gerätetypen (Zeichen/Emoji für NINA und alle 7.188 Material Design Icons für Home Assistant, Suche auch mit deutschen Begriffen wie „drucker“ oder „wlan“), ebenso in der Sensor-Erkennung.
+>
+> **1.2.0:** Zeitplan (Einstellungen › Zeitplan) für Netzwerk-Scan, OPNsense-Abfrage und Agent-Abgleich: an/aus, Intervall, Zeitfenster (auch über Mitternacht) und Wochentage, Status mit letztem/nächstem Lauf und „Jetzt ausführen“. Kein neues Datenbank-Schema.
 >
 > **1.1.0:** Kataloge für Gerätetypen (mehrere je Gerät), Hersteller und Modelle; neue Funde kommen nie automatisch ins Inventar, beim Übernehmen lassen sich Scan- und Agent-Funde zusammenführen. Datenbank-Update von 1.0 (Schema 1 → 2) mit echter 1.0-Datenbank getestet.
 >
@@ -92,3 +94,5 @@ Zugangsdaten (MQTT, OPNsense, MariaDB) liegen **verschlüsselt** in der Datenban
 ## Lizenz
 
 MIT
+
+Enthält die Icon-Liste von [Material Design Icons](https://github.com/Templarian/MaterialDesign) 7.4.47 (`app/web/mdi.json`), Apache License 2.0.
