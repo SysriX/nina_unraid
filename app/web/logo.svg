@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-6.0 0 417.1 170" role="img" aria-label="NINA – Network Inventory Assistant">
+  <defs>
+    <!-- Buchstaben: Schrift Dream MMA (dafont, 100% kostenlos) als Pfade -->
+    <path id="b" d="M39.40 97L20 97L36.22 40L40.47 40L50.50 58.80ZM75.60 34.50L89.60 61.90L101.90 27L127.50 27L106.30 97.10L76.20 97.10L40.60 27L65.60 27Q67.40 26.80 70.45 28.80Q73.50 30.80 75.60 34.50ZM151.48 97L122.48 97L142.98 27L172.88 27ZM187.59 97L168.19 97L184.41 40L188.66 40L198.69 58.80ZM223.79 34.50L237.79 61.90L250.09 27L275.69 27L254.49 97.10L224.39 97.10L188.79 27L213.79 27Q215.59 26.80 218.64 28.80Q221.69 30.80 223.79 34.50ZM359.58 97L385.08 97L323.38 27L298.18 27Q296.38 27 294.58 28.15Q292.78 29.30 291.68 30.70L291.68 30.70Q290.68 32 289.83 33.40Q288.98 34.80 288.38 36.20L288.38 36.20Q288.28 36.60 287.58 39.40Q286.88 42.20 285.88 46.50Q284.88 50.80 283.68 56.25Q282.48 61.70 281.18 67.30L281.18 67.30Q278.18 80.50 274.48 97L274.48 97L308.78 97L312.38 84.10L340.98 83.70Q336.98 79 333.68 75.20L333.68 75.20Q332.38 73.60 331.03 72.10Q329.68 70.60 328.63 69.40Q327.58 68.20 326.93 67.45Q326.28 66.70 326.28 66.70L326.28 66.70L316.38 66.70L319.98 52.10L359.58 97Z"/>
+    <path id="f" d="M36.22 40.00L39.92 27.00L40.60 27.00L47.20 40.00ZM184.41 40.00L188.11 27.00L188.79 27.00L195.39 40.00Z"/>
+    <linearGradient id="rahmen" x1="0" y1="18" x2="0" y2="102" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4b4f58"/><stop offset=".5" stop-color="#33363c"/><stop offset="1" stop-color="#202226"/>
+    </linearGradient>
+    <linearGradient id="seele" x1="0" y1="26" x2="0" y2="96" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#b8f0ff"/><stop offset=".35" stop-color="#4fd0ff"/><stop offset="1" stop-color="#0d8ee0"/>
+    </linearGradient>
+    <radialGradient id="sonne" cx="70" cy="10" r="190" gradientUnits="userSpaceOnUse" gradientTransform="translate(70 10) scale(1 .55) translate(-70 -10)">
+      <stop offset="0" stop-color="#fff" stop-opacity=".6"/><stop offset=".35" stop-color="#fff" stop-opacity=".22"/><stop offset=".7" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="spiegel" x1="0" y1="14" x2="0" y2="62" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff" stop-opacity=".62"/><stop offset=".55" stop-color="#fff" stop-opacity=".3"/><stop offset="1" stop-color="#fff" stop-opacity=".14"/>
+    </linearGradient>
+    <filter id="bogenweich" filterUnits="userSpaceOnUse" x="-100" y="-300" width="700" height="450"><feGaussianBlur stdDeviation=".7"/></filter>
+    <filter id="hinterweich" filterUnits="userSpaceOnUse" x="-50" y="-20" width="600" height="200"><feGaussianBlur stdDeviation="7"/></filter>
+    <mask id="form" maskUnits="userSpaceOnUse" x="-50" y="0" width="600" height="150">
+      <use href="#b" fill="#fff" stroke="#fff" stroke-width="9" stroke-linejoin="miter"/>
+      <use href="#f" fill="#fff" stroke="#fff" stroke-width="9" stroke-linejoin="miter"/>
+    </mask>
+    <mask id="fase" maskUnits="userSpaceOnUse" x="-50" y="0" width="600" height="150">
+      <use href="#b" fill="#fff" stroke="#000" stroke-width="2.4" stroke-linejoin="miter"/>
+    </mask>
+    <mask id="kern" maskUnits="userSpaceOnUse" x="-50" y="0" width="600" height="150">
+      <use href="#b" fill="#fff" stroke="#000" stroke-width="5" stroke-linejoin="miter"/>
+    </mask>
+  </defs>
+
+  <!-- ganz leichter Schatten hinter dem Schriftzug: hell auf dunklem, dunkel auf hellem Untergrund -->
+  <style>
+    .hinterschein{fill:#000;stroke:#000;opacity:.5;transform:translate(0,4px)}
+    @media (prefers-color-scheme: dark){.hinterschein{fill:#fff;stroke:#fff;opacity:.34;transform:none}}
+  </style>
+  <g filter="url(#hinterweich)"><use href="#b" class="hinterschein" stroke-width="9" stroke-linejoin="round"/><use href="#f" class="hinterschein" stroke-width="9" stroke-linejoin="round"/></g>
+
+  <!-- Rand, gleich breit an allen Seiten -->
+  <use href="#b" fill="url(#rahmen)" stroke="url(#rahmen)" stroke-width="9" stroke-linejoin="miter"/>
+  <use href="#f" fill="url(#rahmen)" stroke="url(#rahmen)" stroke-width="9" stroke-linejoin="miter"/>
+  <!-- feine Fase innen am Rand -->
+  <use href="#b" fill="#000" fill-opacity=".35" mask="url(#fase)"/>
+  <!-- blaue Seele, leicht gewölbt -->
+  <g mask="url(#kern)">
+    <use href="#b" fill="#00508f"/>
+    <use href="#b" fill="url(#seele)" transform="translate(0 .9)"/>
+  </g>
+  <!-- Glanz -->
+  <rect x="-50" y="0" width="600" height="110" fill="url(#sonne)" opacity=".6" mask="url(#form)"/>
+  <g mask="url(#form)">
+    <ellipse cx="203" cy="-110" rx="355" ry="168" transform="rotate(-5 203 -110)" fill="url(#spiegel)" filter="url(#bogenweich)"/>
+  </g>
+
+  <!-- ausgeschrieben -->
+  <text x="23.0" y="125" textLength="359.1" font-family="'Segoe UI Semibold','Segoe UI',Arial,Helvetica,sans-serif" font-size="18.0" font-weight="600"
+        fill="#ffffff" stroke="#25272c" stroke-width="3.6" stroke-linejoin="round" paint-order="stroke" letter-spacing="1.5" lengthAdjust="spacing">NETWORK INVENTORY</text>
+  <!-- Trennlinie -->
+  <path d="M67.3 138.4H337.8" stroke="#25272c" stroke-width="3.6" stroke-linecap="round"/>
+  <path d="M67.3 138.4H337.8" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round"/>
+  <text x="111.6" y="164" textLength="182.0" font-family="'Segoe UI Semibold','Segoe UI',Arial,Helvetica,sans-serif" font-size="18.0" font-weight="600"
+        fill="#ffffff" stroke="#25272c" stroke-width="3.6" stroke-linejoin="round" paint-order="stroke" letter-spacing="1.5" lengthAdjust="spacing">ASSISTANT</text>
+</svg>

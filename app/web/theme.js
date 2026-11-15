@@ -2,19 +2,19 @@
 (function () {
   "use strict";
   var THEMES = [
+    ["konsole-blau", "Konsole · blau", "konsole"],
     ["konsole", "Konsole · orange", "konsole"],
     ["konsole-gruen", "Konsole · grün", "konsole"],
-    ["konsole-blau", "Konsole · blau", "konsole"],
     ["dunkel", "Dunkel · schlicht", "flach"],
     ["hell", "Hell", "flach"],
     ["system", "Wie das System", ""],
   ];
-  var SCHLUESSEL = "nina.theme", STANDARD = "konsole";
+  var SCHLUESSEL = "nina.theme", STANDARD = "konsole-blau";
   function lesen() { try { return localStorage.getItem(SCHLUESSEL) || STANDARD; } catch (e) { return STANDARD; } }
   function anwenden(wahl) {
     var t = THEMES.filter(function (x) { return x[0] === wahl; })[0] || THEMES[0];
     var name = t[0];
-    if (name === "system") name = window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches ? "hell" : "konsole";
+    if (name === "system") name = window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches ? "hell" : "konsole-blau";
     var stil = (THEMES.filter(function (x) { return x[0] === name; })[0] || THEMES[0])[2];
     var r = document.documentElement;
     r.setAttribute("data-theme", name);

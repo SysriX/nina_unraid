@@ -1,4 +1,4 @@
-<p align="center"><img src="icon.svg" alt="" width="120"></p>
+<p align="center"><img src="icon.svg" alt="" width="120"><br><img src="app/web/logo.svg" alt="NINA – Network Inventory Assistant" width="380"></p>
 
 # NINA
 

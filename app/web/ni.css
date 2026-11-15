@@ -120,11 +120,15 @@ pre .plus{color:var(--ok)}pre .minus{color:var(--bad)}pre .at{color:var(--akzent
 
 
 /* NINA */
-aside .logo{flex-direction:row;align-items:center}
-aside .logo b{display:block;font-size:16px;letter-spacing:.14em}
-.mitte .logo-gross h1{font-size:22px}
-img.symbol{filter:drop-shadow(0 0 8px rgba(255,255,255,.12)) drop-shadow(0 2px 3px rgba(0,0,0,.4))}
+/* Wortmarke (wie MIRA) */
+aside .logo{flex-direction:column;align-items:flex-start;gap:2px}
+aside .logo img.wortmarke{width:150px;height:auto;margin:-4px 0 -2px -8px}
+aside .logo small{padding-left:2px}
+.mitte .logo-gross img.symbol{width:92px;height:92px;display:block;margin:0 auto 4px}
+.mitte .logo-gross img.wortmarke{display:block;margin:0 auto;width:300px;max-width:100%;height:auto}
+img.symbol{filter:drop-shadow(0 0 8px rgba(255,255,255,.16)) drop-shadow(0 2px 3px rgba(0,0,0,.4))}
 [data-theme=hell] img.symbol{filter:drop-shadow(0 4px 8px rgba(0,0,0,.28))}
+[data-theme=hell] img.nur-dunkel,:root:not([data-theme=hell]) img.nur-hell{display:none!important}
 .suche{min-width:220px;flex:1;max-width:360px}
 .werte{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
 .wert{background:var(--code);border-radius:10px;padding:9px 11px;min-width:0}

@@ -43,3 +43,12 @@ pip install -r requirements.txt
 NINA_DATA=./daten NINA_PORT=18095 NINA_SETUP_TOKEN=TEST-TEST-TEST python app/main.py
 ```
 Ohne nmap scannt NINA per Ping (bis /22).
+
+## Logo und Symbol
+
+`werkzeuge/nina-logo.js` erzeugt `app/web/logo*.svg` und `icon.svg` (Schrift **Dream MMA**, dafont, 100 % kostenlos, als Pfade; Aufbau wie MIRA, Akzent Blau). Braucht opentype.js und die TTF-Datei:
+
+```bash
+DREAM_BASIS=<ordner mit otjs/node_modules/opentype.js und dreammma-dl/x/Dream MMA.ttf> node werkzeuge/nina-logo.js app/web <pfad zu mira icon.svg>
+```
+Die Unterzeilen sind Text in Segoe UI Semibold (zum Messen wird `C:/Windows/Fonts/seguisb.ttf` gelesen).

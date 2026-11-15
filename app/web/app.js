@@ -164,7 +164,8 @@ function aktuelleRoute() { const [n, q] = location.hash.slice(1).split("?"); ret
 function rahmen() {
   const r = aktuelleRoute();
   const navi = h("aside", { id: "navi" },
-    h("div", { class: "logo" }, h("img", { src: "/static/icon.svg", alt: "" }), h("div", {}, h("b", {}, "NINA"), h("small", {}, META.name !== "NINA" ? META.name : "Network INventory Assistant"))),
+    h("div", { class: "logo" }, h("img", { src: "/static/logo-kurz-dunkel.svg", alt: "NINA", class: "wortmarke nur-dunkel" }), h("img", { src: "/static/logo-kurz-hell.svg", alt: "NINA", class: "wortmarke nur-hell" }),
+      h("small", {}, META.name !== "NINA" ? META.name : "Network INventory Assistant")),
     NAVI.map(([gruppe, eintraege]) => [gruppe ? h("h4", {}, gruppe) : null,
       eintraege.filter(([, , , rolle]) => !rolle || darf(rolle)).map(([k, t, , , zahl]) =>
         h("a", { class: "nav" + (r.name === k || (k === "geraete" && r.name === "geraet") ? " an" : ""), href: "#" + k,
@@ -216,7 +217,9 @@ async function start() {
 }
 
 function logoGross(unter) {
-  return h("div", { class: "logo-gross" }, h("img", { src: "/static/icon.svg", alt: "", class: "symbol" }), h("h1", {}, "NINA"), h("div", {}, unter));
+  return h("div", { class: "logo-gross" }, h("img", { src: "/static/icon.svg", alt: "", class: "symbol" }),
+    h("img", { src: "/static/logo-dunkel.svg", alt: "NINA – Network Inventory Assistant", class: "wortmarke nur-dunkel" }),
+    h("img", { src: "/static/logo-hell.svg", alt: "NINA – Network Inventory Assistant", class: "wortmarke nur-hell" }), unter ? h("div", {}, unter) : null);
 }
 
 // ------------------------------------------------------------------ Anmeldung
@@ -229,7 +232,7 @@ function zeigeAnmeldung() {
     feld("Benutzer", eingabe("benutzer", "", { autocomplete: "username", required: true })),
     feld("Passwort", eingabe("passwort", "", { type: "password", autocomplete: "current-password", required: true })),
     h("button", { class: "p voll", type: "submit" }, "Anmelden"));
-  leeren($("#app"), h("div", { class: "ecke" }, themeWahl()), h("div", { class: "mitte" }, logoGross("Network INventory Assistant"), h("div", { class: "karte" }, f)));
+  leeren($("#app"), h("div", { class: "ecke" }, themeWahl()), h("div", { class: "mitte" }, logoGross(""), h("div", { class: "karte" }, f)));
 }
 
 async function eigenesPasswort() {
