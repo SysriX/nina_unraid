@@ -97,9 +97,9 @@ ANSICHT.einstellungen = { titel: "Einstellungen", async zeigen(main, q) {
   const tab = q.get("tab") || "allgemein";
   const e = await api("GET", "/api/einstellungen");
   const sys = await api("GET", "/api/system");
-  const inhalt = { allgemein: () => allgemeinTab(e.allgemein), mqtt: () => mqttTab(e.mqtt), opnsense: () => opnsenseTab(e.opnsense),
+  const inhalt = { allgemein: () => allgemeinTab(e.allgemein), zeitplan: () => zeitplanTab(), mqtt: () => mqttTab(e.mqtt), opnsense: () => opnsenseTab(e.opnsense),
     sicherung: () => sicherungTab(sys) }[tab]();
-  leeren(main, h("div", { class: "leiste" }, tabs([["allgemein", "Allgemein"], ["mqtt", "MQTT / HASS.Agent"], ["opnsense", "OPNsense"], ["sicherung", "Datenbank & Sicherung"]], tab,
+  leeren(main, h("div", { class: "leiste" }, tabs([["allgemein", "Allgemein"], ["zeitplan", "Zeitplan"], ["mqtt", "MQTT / HASS.Agent"], ["opnsense", "OPNsense"], ["sicherung", "Datenbank & Sicherung"]], tab,
     k => { location.hash = `#einstellungen?tab=${k}`; })), inhalt);
 } };
 
@@ -246,3 +246,77 @@ ANSICHT.protokoll = { titel: "Protokoll", async zeigen(main) {
     { t: "Details", w: p => h("span", { class: "leise klein-t" }, (p.details || "").slice(0, 160)) }, { t: "IP", w: p => p.ip },
   ], d.eintraege, { leer: "Noch keine Einträge" })));
 } };
+
+// ------------------------------------------------------------------ Zeitplan
+const TAGE = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+
+function zeitplanTab() {
+  const box = h("div", {}, h("div", { class: "leer" }, "Lädt …"));
+  let d = null;
+  const statusEls = {};
+  const statusZeile = q => {
+    const z = d.zustand[q];
+    return h("div", { class: "status-zeile klein-t" },
+      z.laeuft ? [punkt("warn"), "läuft gerade …"] : z.ok === null ? [punkt(""), "noch nicht gelaufen"] : [punkt(z.ok ? "ok" : "bad"), `zuletzt ${vorZeit(z.zuletzt)} (${z.dauer} s)`],
+      z.naechster && d.zeitplan[q].aktiv ? h("span", { class: "leise" }, `· nächster Lauf ${z.im_fenster ? datum(z.naechster) : "im nächsten Zeitfenster"}`) : null,
+      !d.zeitplan[q].aktiv ? marke("aus") : !z.im_fenster ? marke("außerhalb des Zeitfensters", "warn") : null,
+      z.ergebnis ? h("div", { class: "leise", style: { flexBasis: "100%" } }, z.ergebnis) : null);
+  };
+  const zeichneStatus = () => { for (const q of Object.keys(statusEls)) leeren(statusEls[q], statusZeile(q)); };
+  const fenster = (c, mitIntervall) => {
+    const tage = new Set(c.tage || []);
+    const el = h("div", {},
+      h("div", { class: "raster" },
+        h("div", {}, haken("Automatisch ausführen", c.aktiv, null, "aktiv").el),
+        mitIntervall ? feld("Alle … Minuten", eingabe("intervall", c.intervall, { type: "number", min: 1 })) : null,
+        feld("Von", eingabe("von", c.von, { type: "time" }), "leer = ganztägig"),
+        feld("Bis", eingabe("bis", c.bis, { type: "time" }), "über Mitternacht möglich, z. B. 22:00–06:00")),
+      h("div", { class: "feld" }, h("span", {}, "Tage"), h("div", { class: "chips" }, TAGE.map((t, i) => h("label", { class: "chip" + (tage.has(i) ? " an" : "") },
+        h("input", { type: "checkbox", checked: tage.has(i), "data-tag": i, onchange: e => e.target.parentNode.classList.toggle("an", e.target.checked) }), t))),
+        h("small", {}, "keiner gewählt = jeden Tag")));
+    el.werte = () => ({ ...lesenForm(el), tage: [...el.querySelectorAll("input[data-tag]")].filter(i => i.checked).map(i => +i.dataset.tag) });
+    return el;
+  };
+  const karte = (q, inhalt, hilfe) => {
+    statusEls[q] = h("div", { style: { margin: "-4px 0 12px" } });
+    return h("div", { class: "karte" },
+      h("h2", {}, d.zustand[q].titel, h("span", { class: "rechts" }, darf("operator") ? h("button", { class: "klein", onclick: async e => {
+        e.target.disabled = true; e.target.textContent = "Läuft …";
+        try { const r = await api("POST", `/api/zeitplan/${q}/jetzt`); hinweis(`${d.zustand[q].titel}: ${r.ergebnis}`, !r.ok); }
+        catch (er) { hinweis(er.message, true); }
+        await laden(true); e.target.disabled = false; e.target.textContent = "Jetzt ausführen";
+      } }, "Jetzt ausführen") : null)),
+      statusEls[q], h("p", { class: "leise klein-t", style: { marginTop: 0 } }, hilfe), inhalt);
+  };
+  const laden = async (nurStatus) => {
+    d = await api("GET", "/api/zeitplan");
+    if (nurStatus && Object.keys(statusEls).length) return zeichneStatus();
+    const scan = fenster(d.zeitplan.scan, false), ops = fenster(d.zeitplan.opnsense, true), ag = fenster(d.zeitplan.agent, true);
+    const agExtra = h("div", { class: "raster" },
+      feld("Offline nach … Minuten ohne Daten", eingabe("offline_nach", d.zeitplan.agent.offline_nach, { type: "number", min: 2 }), "falls ein Agent sich nicht abmeldet (Absturz, Strom weg)"),
+      h("div", {}, haken("Agenten um neue Meldung bitten", d.zeitplan.agent.neu_melden, "Sendet „online“ an <präfix>/status – klassischer HASS.Agent meldet dann Sensoren/Befehle neu (wie nach einem HA-Neustart). HASS.Agent .NET10 braucht das nicht.", "neu_melden").el));
+    const netzWerte = new Map(d.netze.map(n => [n.id, { id: n.id, scan_aktiv: n.scan_aktiv, scan_intervall: n.scan_intervall }]));
+    const netzTab = tabelle([
+      { t: "An", w: n => h("input", { type: "checkbox", checked: n.scan_aktiv, onchange: e => { netzWerte.get(n.id).scan_aktiv = e.target.checked; } }) },
+      { t: "Netzwerk", w: n => h("div", { class: "zwei-zeilen" }, h("b", {}, n.name), h("small", { class: "mono" }, n.cidr)) },
+      { t: "Alle … min", w: n => h("input", { type: "number", min: 1, value: n.scan_intervall, style: { width: "80px" }, oninput: e => { netzWerte.get(n.id).scan_intervall = +e.target.value; } }) },
+      { t: "Methode", w: n => n.scan_methode },
+      { t: "Letzter Scan", w: n => h("div", { class: "zwei-zeilen" }, vorZeit(n.letzter_scan), h("small", {}, n.scan_status)) },
+      { t: "Nächster", w: n => n.scan_aktiv && n.naechster ? datum(n.naechster) : "–" },
+    ], d.netze, { leer: "Noch kein Netzwerk – unter Inventar › Netzwerke anlegen." });
+    leeren(box,
+      karte("scan", h("div", {}, scan, h("h4", {}, "Intervall je Netzwerk"), netzTab),
+        "Ping/nmap-Scan der eingetragenen Netze (je Netz eigenes Intervall). Das Zeitfenster gilt für alle Netze."),
+      karte("opnsense", ops, "ARP-Tabelle und DHCP-Leases der OPNsense über alle VLANs – findet auch Geräte in fremden Netzen samt MAC."),
+      karte("agent", h("div", {}, ag, agExtra), "HASS.Agent-Werte kommen laufend per MQTT. Der Abgleich verknüpft Agenten mit Geräten, übernimmt gemeldete Adressen und setzt stumme Agenten offline."),
+      h("div", { class: "leiste" }, h("span", { class: "leise klein-t" }, "Neue Funde aus allen Läufen landen unter „Neu gefunden“."),
+        h("span", { class: "rechts" }, darf("admin") ? h("button", { class: "p", onclick: async () => {
+          await versuch(() => api("POST", "/api/zeitplan", { scan: scan.werte(), opnsense: ops.werte(), agent: { ...ag.werte(), ...lesenForm(agExtra) }, netze: [...netzWerte.values()] }), "Zeitplan gespeichert");
+          laden();
+        } }, "Speichern") : null)));
+    zeichneStatus();
+  };
+  laden().catch(e => leeren(box, h("div", { class: "karte" }, h("pre", {}, e.message))));
+  alle(10, () => laden(true));
+  return box;
+}

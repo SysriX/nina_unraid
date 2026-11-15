@@ -122,7 +122,8 @@ class Dienst:
         self._re = None
         self.net10: dict[str, dict] = {}         # serial -> {aid, app, dienst, schluessel}
         self.net10_warte: dict[str, dict] = {}
-        self.ips: dict[int, set] = {}            # Agent -> gemeldete IP-Adressen   # serial -> {topic: payload} bis das Gerät bekannt ist
+        self.ips: dict[int, set] = {}            # Agent -> gemeldete IP-Adressen
+        self.offline_nach = 600                  # s ohne Daten → offline (Agenten ohne availability-Topic)   # serial -> {topic: payload} bis das Gerät bekannt ist
 
     # -------------------------------------------------------------- Start/Stopp
     def start(self):
@@ -684,7 +685,7 @@ class Dienst:
                 self.werte[k]["neu"] = False
             jetzt_t = time.time()
             abgelaufen = [aid for aid, (an, t) in self.online.items()
-                          if an and not self.verfuegbar.get(aid) and jetzt_t - t > 600]
+                          if an and not self.verfuegbar.get(aid) and jetzt_t - t > self.offline_nach]
         if neu:
             with sitzung() as s:
                 for (aid, key), v in neu.items():
@@ -712,6 +713,38 @@ class Dienst:
 
 
 DIENST = Dienst()
+
+
+def abgleich(offline_nach_min: int = 10, neu_melden: bool = False) -> dict:
+    """Agent-Abgleich (Zeitplan): Agenten ohne Gerät verknüpfen, stumme Agenten offline setzen,
+    optional alle Agenten um neue Meldung bitten (wie Home Assistant nach einem Neustart)."""
+    import time as _t
+    DIENST.offline_nach = max(120, offline_nach_min * 60)
+    verknuepft = offline = 0
+    jetzt_t = _t.time()
+    with sitzung() as s:
+        agenten = list(s.scalars(select(Agent)))
+        for a in agenten:
+            if not a.geraet_id:
+                DIENST._verknuepfen(s, a)
+                if a.geraet_id:
+                    verknuepft += 1
+        ids = [(a.id, a.online, kern.utc(a.zuletzt)) for a in agenten]
+    for aid, an, zuletzt in ids:
+        live = DIENST.online.get(aid)
+        letzte = max(live[1] if live else 0, zuletzt.timestamp() if zuletzt else 0)
+        # gilt für alle Agenten: kommt gar nichts mehr (auch kein availability-„offline“), nach der Frist offline
+        if an and letzte and jetzt_t - letzte > DIENST.offline_nach:
+            DIENST._online(aid, False)
+            offline += 1
+    gemeldet = False
+    if neu_melden and DIENST.client and DIENST.verbunden:
+        praefix = konfig()["praefix"].strip("/") or "homeassistant"
+        DIENST.client.publish(f"{praefix}/status", "online", qos=0)      # klassischer HASS.Agent sendet seine Discovery neu
+        gemeldet = True
+    with sitzung() as s:
+        online = s.scalar(select(func.count(Agent.id)).where(Agent.online.is_(True))) or 0
+    return {"agenten": len(ids), "online": online, "verknuepft": verknuepft, "offline": offline, "gemeldet": gemeldet}
 
 
 def agent_ips(aid: int) -> set:

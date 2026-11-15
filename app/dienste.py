@@ -5,9 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 import socket
-import time
 
-from sqlalchemy import select
 
 import kern
 import netz
@@ -70,32 +68,9 @@ async def _schleife(name: str, fn, intervall_fn, verzoegerung: float = 5):
         await asyncio.sleep(max(5, intervall_fn()))
 
 
-def _scans_faellig():
-    import inventar
-    from modelle import Netzwerk
-    with kern.sitzung() as s:
-        faellig = [n.id for n in s.scalars(select(Netzwerk).where(Netzwerk.scan_aktiv.is_(True)))
-                   if not n.letzter_scan or (kern.jetzt() - kern.utc(n.letzter_scan)).total_seconds() >= n.scan_intervall * 60]
-    for nid in faellig:
-        try:
-            inventar.scan(nid)
-        except Exception as e:  # noqa: BLE001
-            kern.log("Scan", nid, e)
-
-
-_letzter_abgleich = 0.0
-
-
-def _opnsense():
-    global _letzter_abgleich
-    import inventar
-    import opnsense
-    if opnsense.eingerichtet() and time.time() - _letzter_abgleich > 300:
-        _letzter_abgleich = time.time()
-        try:
-            inventar.opnsense_abgleich()
-        except Exception as e:  # noqa: BLE001
-            kern.log("OPNsense-Abgleich:", e)
+def _zeitplan():
+    import zeitplan
+    zeitplan.schleife_einmal()
 
 
 def _ueberwachen():
@@ -121,8 +96,7 @@ def _aufraeumen():
 
 
 def starten() -> list[asyncio.Task]:
-    return [asyncio.create_task(_schleife("Scan", _scans_faellig, lambda: 30, 10)),
-            asyncio.create_task(_schleife("OPNsense", _opnsense, lambda: 60, 20)),
+    return [asyncio.create_task(_schleife("Zeitplan", _zeitplan, lambda: 30, 10)),
             asyncio.create_task(_schleife("Überwachung", _ueberwachen, _intervall_ueberwachen, 15)),
             asyncio.create_task(_schleife("Agent", _agent_speichern, lambda: 30, 30)),
             asyncio.create_task(_schleife("Aufräumen", _aufraeumen, lambda: 6 * 3600, 120))]

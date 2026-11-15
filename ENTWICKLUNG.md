@@ -16,7 +16,8 @@
 | `app/agent.py` | HASS.Agent über MQTT (klassische Discovery und .NET10-Protokoll), Befehle |
 | `app/muster.py` | Erkennungs-Muster für Sensoren/Befehle (Vorgaben in `STANDARD`) |
 | `app/haapi.py` | API für Home Assistant `/api/ha/v1` |
-| `app/dienste.py` | Hintergrund-Schleifen (Scans, Überwachung, OPNsense, Agent speichern, Aufräumen), mDNS |
+| `app/zeitplan.py` | Zeitplan der automatischen Läufe (Scan, OPNsense, Agent-Abgleich), Zeitfenster, Laufstatus, „Jetzt ausführen“ |
+| `app/dienste.py` | Hintergrund-Takt (Zeitplan, Ping-Überwachung, Agent-Werte speichern, Aufräumen), mDNS |
 | `app/web/` | Oberfläche (Vanilla-JS, Stil wie MIRA) |
 
 ## Schema-Versionen

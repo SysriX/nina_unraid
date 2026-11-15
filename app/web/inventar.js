@@ -318,6 +318,7 @@ ANSICHT.netzwerke = { titel: "Netzwerke", async zeigen(main) {
       h("div", { class: "leiste" }, h("span", { class: "leise klein-t" }, `Container-Adressen: ${d.eigene.join(", ") || "?"} · Scanner: ${d.nmap ? "nmap" : "Ping (nmap fehlt)"} · OPNsense: ${d.opnsense ? "eingerichtet" : "nicht eingerichtet"}`),
         h("span", { class: "rechts" },
           d.opnsense && darf("operator") ? h("button", { onclick: async () => { const r = await versuch(() => api("POST", "/api/opnsense/abgleich")); hinweis(`OPNsense: ${r.gefunden} bekannt, ${r.neu} neu`); laden(); } }, "OPNsense abgleichen") : null,
+          h("a", { href: "#einstellungen?tab=zeitplan" }, h("button", {}, "Zeitplan")),
           darf("admin") ? h("button", { class: "p", onclick: () => netzDialog(null, d).then(r => r && laden()) }, "Netzwerk hinzufügen") : null)),
       h("div", { class: "karte" }, tabelle([
         { t: "Name", w: n => h("div", { class: "zwei-zeilen" }, h("b", {}, n.name), n.beschreibung ? h("small", {}, n.beschreibung) : null) },
