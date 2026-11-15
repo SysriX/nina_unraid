@@ -209,7 +209,7 @@ def eigene_adressen() -> list[ipaddress.IPv4Interface]:
 
 
 def eigene_ip() -> str:
-    a = os.environ.get("NI_ADRESSE", "").strip()
+    a = os.environ.get("NINA_ADRESSE", "").strip()
     if a:
         return a
     e = eigene_adressen()

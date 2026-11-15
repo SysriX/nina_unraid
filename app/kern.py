@@ -1,7 +1,7 @@
-"""NetInventory – Kern: Startkonfiguration, Verschlüsselung, Datenbank-Verbindung, Einstellungen, Protokoll.
+"""NINA – Kern: Startkonfiguration, Verschlüsselung, Datenbank-Verbindung, Einstellungen, Protokoll.
 
-Startkonfiguration  <NI_DATA>/netinventory.json  (welche Datenbank, ob eingerichtet, Instanz-ID)
-Schlüssel           <NI_DATA>/schluessel.key     (oder Umgebungsvariable NI_KEY)
+Startkonfiguration  <NINA_DATA>/nina.json  (welche Datenbank, ob eingerichtet, Instanz-ID)
+Schlüssel           <NINA_DATA>/schluessel.key     (oder Umgebungsvariable NINA_KEY)
 Alles andere liegt in der Datenbank (Tabellen ni_*). Das Schema wird über migrationen.py versioniert,
 damit neue Container-Versionen eine vorhandene Datenbank selbst aktualisieren können.
 Geheimnisse (Passwörter, API-Schlüssel) werden vor dem Speichern mit Fernet verschlüsselt.
@@ -22,8 +22,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 VERSION = "1.0.0"
-DATA = os.environ.get("NI_DATA", "/config")
-KONFIG_DATEI = os.path.join(DATA, "netinventory.json")
+DATA = os.environ.get("NINA_DATA", "/config")
+KONFIG_DATEI = os.path.join(DATA, "nina.json")
 SCHLUESSEL_DATEI = os.path.join(DATA, "schluessel.key")
 
 
@@ -44,7 +44,7 @@ def iso(d: datetime | None) -> str | None:
 
 
 def log(*a):
-    print("[netinventory]", *a, flush=True)
+    print("[nina]", *a, flush=True)
 
 
 # ------------------------------------------------------------------ Startkonfiguration
@@ -89,7 +89,7 @@ def fernet() -> Fernet:
     global _fernet
     if _fernet:
         return _fernet
-    key = os.environ.get("NI_KEY", "").strip()
+    key = os.environ.get("NINA_KEY", "").strip()
     if not key:
         if os.path.exists(SCHLUESSEL_DATEI):
             with open(SCHLUESSEL_DATEI, encoding="utf-8") as f:
@@ -132,7 +132,7 @@ def db_url(k: dict | None = None) -> str | None:
     if not db:
         return None
     if db.get("typ") == "sqlite":
-        return "sqlite:///" + os.path.join(DATA, db.get("datei") or "netinventory.db")
+        return "sqlite:///" + os.path.join(DATA, db.get("datei") or "nina.db")
     if db.get("typ") == "mariadb":
         from urllib.parse import quote_plus
         pw = entschluesseln(db.get("passwort_enc")).get("p", "") if db.get("passwort_enc") else ""

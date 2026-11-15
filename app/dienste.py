@@ -1,5 +1,5 @@
 """Hintergrund-Dienste: Zeitplan für Scans, Ping-Überwachung, OPNsense-Abgleich, Agent-Werte speichern,
-Aufräumen – und die Bekanntgabe per mDNS/Zeroconf (_netinventory._tcp), damit Home Assistant den Dienst findet."""
+Aufräumen – und die Bekanntgabe per mDNS/Zeroconf (_nina._tcp), damit Home Assistant den Dienst findet."""
 from __future__ import annotations
 
 import asyncio
@@ -12,11 +12,11 @@ from sqlalchemy import select
 import kern
 import netz
 
-MDNS_TYP = "_netinventory._tcp.local."
+MDNS_TYP = "_nina._tcp.local."
 
 
 def port() -> int:
-    return int(os.environ.get("NI_PORT", "8080"))
+    return int(os.environ.get("NINA_PORT", "8080"))
 
 
 class Mdns:
@@ -26,17 +26,17 @@ class Mdns:
         self.status = "aus"
 
     def start(self):
-        if os.environ.get("NI_MDNS", "1").lower() in ("0", "nein", "false", "aus"):
-            self.status = "abgeschaltet (NI_MDNS=0)"
+        if os.environ.get("NINA_MDNS", "1").lower() in ("0", "nein", "false", "aus"):
+            self.status = "abgeschaltet (NINA_MDNS=0)"
             return
         try:
             from zeroconf import IPVersion, ServiceInfo, Zeroconf
             ip = netz.eigene_ip()
-            name = (kern.einstellung("allgemein", {}) or {}).get("name") or "NetInventory" if kern.db_bereit() else "NetInventory"
+            name = (kern.einstellung("allgemein", {}) or {}).get("name") or "NINA" if kern.db_bereit() else "NINA"
             inst = kern.instanz_id()
             self.info = ServiceInfo(MDNS_TYP, f"{name} {inst[:4]}.{MDNS_TYP}", addresses=[socket.inet_aton(ip)], port=port(),
                                     properties={"id": inst, "version": kern.VERSION, "pfad": "/api/ha/v1", "name": name},
-                                    server=f"netinventory-{inst}.local.")
+                                    server=f"nina-{inst}.local.")
             self.zc = Zeroconf(ip_version=IPVersion.V4Only, interfaces=[ip] if ip != "127.0.0.1" else None)
             self.zc.register_service(self.info, allow_name_change=True)
             self.status = f"angekündigt als {self.info.name} auf {ip}:{port()}"

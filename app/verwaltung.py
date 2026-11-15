@@ -220,13 +220,13 @@ def _zeile(o) -> dict:
 def sicherung(ich: dict = Depends(ADMIN)):
     import inventar
     with sitzung() as s:
-        daten = {"format": "netinventory", "version": kern.VERSION, "schema": migrationen.AKTUELL, "erstellt": iso(kern.jetzt()),
+        daten = {"format": "nina", "version": kern.VERSION, "schema": migrationen.AKTUELL, "erstellt": iso(kern.jetzt()),
                  "allgemein": inventar.allgemein()}
         for name, modell in TABELLEN:
             daten[name] = [_zeile(o) for o in s.scalars(select(modell))]
     protokoll(ich["name"], "sicherung", "exportiert")
     return Response(json.dumps(daten, ensure_ascii=False, indent=1), media_type="application/json",
-                    headers={"Content-Disposition": f'attachment; filename="netinventory-{kern.jetzt():%Y%m%d-%H%M}.json"'})
+                    headers={"Content-Disposition": f'attachment; filename="nina-{kern.jetzt():%Y%m%d-%H%M}.json"'})
 
 
 def _ist_zeit(spalte) -> bool:
@@ -240,8 +240,8 @@ def _ist_zeit(spalte) -> bool:
 async def wiederherstellen(req: Request, ich: dict = Depends(ADMIN)):
     """Ersetzt Netzwerke, Geräte, Schnittstellen und Muster durch den Inhalt der Sicherung."""
     d = await req.json()
-    if d.get("format") != "netinventory":
-        raise HTTPException(400, "Keine NetInventory-Sicherung")
+    if d.get("format") != "nina":
+        raise HTTPException(400, "Keine NINA-Sicherung")
     with sitzung() as s:
         for a in s.scalars(select(Agent)):
             a.geraet_id = None

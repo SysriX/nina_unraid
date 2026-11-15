@@ -1,4 +1,4 @@
-"""NetInventory – Netzwerk- und IT-Geräteliste. Startpunkt (FastAPI + uvicorn)."""
+"""NINA – Netzwerk- und IT-Geräteliste. Startpunkt (FastAPI + uvicorn)."""
 from __future__ import annotations
 
 import os
@@ -30,7 +30,7 @@ async def lebenszyklus(app):
     import asyncio
     await asyncio.to_thread(dienste.MDNS.start)   # Zeroconf-API blockiert – nicht im Event-Loop aufrufen
     aufgaben = dienste.starten()
-    kern.log(f"NetInventory {kern.VERSION} bereit auf Port {dienste.port()}")
+    kern.log(f"NINA {kern.VERSION} bereit auf Port {dienste.port()}")
     yield
     for t in aufgaben:
         t.cancel()
@@ -38,7 +38,7 @@ async def lebenszyklus(app):
     await asyncio.to_thread(dienste.MDNS.stop)
 
 
-app = FastAPI(title="NetInventory", version=kern.VERSION, docs_url=None, redoc_url=None, openapi_url=None, lifespan=lebenszyklus)
+app = FastAPI(title="NINA", version=kern.VERSION, docs_url=None, redoc_url=None, openapi_url=None, lifespan=lebenszyklus)
 
 
 @app.middleware("http")
@@ -113,8 +113,8 @@ def start():
 if __name__ == "__main__":
     import uvicorn
     tls = {}
-    if os.environ.get("NI_TLS_CERT") and os.environ.get("NI_TLS_KEY"):
-        tls = {"ssl_certfile": os.environ["NI_TLS_CERT"], "ssl_keyfile": os.environ["NI_TLS_KEY"]}
-    uvicorn.run(app, host=os.environ.get("NI_HOST", "0.0.0.0"), port=int(os.environ.get("NI_PORT", "8080")), proxy_headers=True,
-                forwarded_allow_ips=os.environ.get("NI_PROXY_IPS", "127.0.0.1"), log_level="warning",
+    if os.environ.get("NINA_TLS_CERT") and os.environ.get("NINA_TLS_KEY"):
+        tls = {"ssl_certfile": os.environ["NINA_TLS_CERT"], "ssl_keyfile": os.environ["NINA_TLS_KEY"]}
+    uvicorn.run(app, host=os.environ.get("NINA_HOST", "0.0.0.0"), port=int(os.environ.get("NINA_PORT", "8080")), proxy_headers=True,
+                forwarded_allow_ips=os.environ.get("NINA_PROXY_IPS", "127.0.0.1"), log_level="warning",
                 server_header=False, **tls)

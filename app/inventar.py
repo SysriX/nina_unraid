@@ -24,7 +24,7 @@ TYPEN = [("pc", "PC"), ("laptop", "Laptop"), ("server", "Server"), ("vm", "Virtu
 TYP_NAMEN = dict(TYPEN)
 STATUS = ("aktiv", "neu", "ignoriert", "ausgemustert")
 
-STANDARD_ALLGEMEIN = {"name": "NetInventory", "neue_geraete": "pruefen", "ueberwachen_intervall": 60,
+STANDARD_ALLGEMEIN = {"name": "NINA", "neue_geraete": "pruefen", "ueberwachen_intervall": 60,
                       "wol_port": 9, "agent_geraete_anlegen": True, "ereignisse_tage": 90, "zusatzfelder": []}
 
 _scan_lock: dict[int, threading.Lock] = {}

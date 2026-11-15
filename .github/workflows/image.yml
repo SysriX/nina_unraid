@@ -1,4 +1,4 @@
-# Baut NetInventory und lädt es zu GitHub (ghcr.io) und – wenn eingerichtet – zu Docker Hub hoch.
+# Baut NINA und lädt es zu GitHub (ghcr.io) und – wenn eingerichtet – zu Docker Hub hoch.
 #   - bei jeder Änderung am Image (nicht nur README/Vorlage/Symbol)
 #   - täglich: nur wenn das offizielle Basis-Image neu ist (neue Version oder Sicherheitsupdate)
 #   - von Hand: Actions › Image › Run workflow (mit "erzwingen" immer)
@@ -24,7 +24,7 @@ permissions:
   actions: write   # für keepalive (GitHub pausiert Zeitpläne sonst nach 60 Tagen ohne Commit)
 
 env:
-  NAME: netinventory
+  NAME: nina
   BASE: docker.io/library/python
   # Versionslinie des Basis-Images; Wechsel hier eintragen.
   BASE_TAG: '3.13-slim'

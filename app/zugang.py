@@ -1,6 +1,6 @@
 """Einrichtung beim ersten Start, Anmeldung, Benutzer und API-Schlüssel (für Home Assistant).
 
-Einrichtung: geschützt durch einen Code im Container-Log (oder NI_SETUP_TOKEN).
+Einrichtung: geschützt durch einen Code im Container-Log (oder NINA_SETUP_TOKEN).
   1. Datenbank: eingebaut (SQLite) oder MariaDB (vorhanden oder mit Root-Zugang anlegen)
   2. Admin-Benutzer anlegen (oder vorhandene Benutzer aus der Datenbank übernehmen)
 Rollen: leser (nur ansehen) < operator (wecken, Befehle, Scan) < admin (alles).
@@ -85,7 +85,7 @@ def code() -> str:
     global _code
     if _code:
         return _code
-    _code = os.environ.get("NI_SETUP_TOKEN", "").strip()
+    _code = os.environ.get("NINA_SETUP_TOKEN", "").strip()
     if not _code:
         if os.path.exists(CODE_DATEI):
             with open(CODE_DATEI, encoding="utf-8") as f:
@@ -112,7 +112,7 @@ def code_melden():
 def aktueller(req: Request) -> dict:
     """Angemeldeter Benutzer (Cookie) oder API-Schlüssel (Authorization: Bearer …)."""
     if not kern.db_bereit():
-        raise HTTPException(409, "NetInventory ist noch nicht eingerichtet")
+        raise HTTPException(409, "NINA ist noch nicht eingerichtet")
     auth = req.headers.get("authorization", "")
     if auth.lower().startswith("bearer "):
         h = _hash(auth[7:].strip())
@@ -312,7 +312,7 @@ def schluessel_weg(kid: int, req: Request, ich: dict = Depends(ADMIN)):
 # ------------------------------------------------------------------ Einrichtung
 def _e_pruefen(req: Request):
     if eingerichtet():
-        raise HTTPException(409, "NetInventory ist bereits eingerichtet")
+        raise HTTPException(409, "NINA ist bereits eingerichtet")
     if not hmac.compare_digest(req.headers.get("x-ni-einrichtung", ""), code()):
         raise HTTPException(403, "Einrichtungs-Code falsch – er steht im Log des Containers")
 
@@ -339,7 +339,7 @@ async def e_db(req: Request):
     typ = d.get("typ", "sqlite")
     k = kern.konfig_lesen()
     if typ == "sqlite":
-        k["db"] = {"typ": "sqlite", "datei": "netinventory.db"}
+        k["db"] = {"typ": "sqlite", "datei": "nina.db"}
     elif typ == "mariadb":
         for f in ("host", "name", "benutzer"):
             if not str(d.get(f, "")).strip():

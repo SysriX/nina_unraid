@@ -1,4 +1,4 @@
-"""NetInventory – Datenbank-Modelle (immer der NEUESTE Stand des Schemas).
+"""NINA – Datenbank-Modelle (immer der NEUESTE Stand des Schemas).
 
 Wichtig für Erweiterungen: Jede Änderung hier braucht einen passenden Schritt in migrationen.py
 (Version hochzählen), damit vorhandene Datenbanken beim Update mitziehen. Neue Tabellen legt

@@ -40,6 +40,6 @@ Neue Felder, die nur angezeigt/gespeichert werden sollen, gehen oft ohne Schema-
 
 ```bash
 pip install -r requirements.txt
-NI_DATA=./daten NI_PORT=18095 NI_SETUP_TOKEN=TEST-TEST-TEST python app/main.py
+NINA_DATA=./daten NINA_PORT=18095 NINA_SETUP_TOKEN=TEST-TEST-TEST python app/main.py
 ```
-Ohne nmap scannt NetInventory per Ping (bis /22).
+Ohne nmap scannt NINA per Ping (bis /22).

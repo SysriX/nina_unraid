@@ -1,4 +1,4 @@
-"""NetInventory – Schema-Versionen und Aktualisierung der Datenbank.
+"""NINA – Schema-Versionen und Aktualisierung der Datenbank.
 
 So funktioniert ein Update des Containers:
   * Neue, leere Datenbank: alle Tabellen nach modelle.py anlegen, Version = AKTUELL.

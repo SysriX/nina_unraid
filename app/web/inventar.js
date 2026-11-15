@@ -1,4 +1,4 @@
-/* NetInventory – Ansichten: Übersicht, Geräte, Gerät, Neu gefunden, Netzwerke, Ereignisse */
+/* NINA – Ansichten: Übersicht, Geräte, Gerät, Neu gefunden, Netzwerke, Ereignisse */
 "use strict";
 
 const TYP_SYMBOL = { pc: "🖥", laptop: "💻", server: "🗄", vm: "◫", nas: "🗃", netzwerk: "⇄", router: "🛡", drucker: "🖨", telefon: "📱",
@@ -143,7 +143,7 @@ ANSICHT.geraet = { titel: "Gerät", async zeigen(main, q) {
   const id = Number(q.get("id"));
   const zeichnen = async () => {
     const g = await api("GET", `/api/geraete/${id}`);
-    $("#titel").textContent = g.name; document.title = `${g.name} – NetInventory`;
+    $("#titel").textContent = g.name; document.title = `${g.name} – NINA`;
     const links = h("div", {},
       h("div", { class: "karte" },
         h("h2", {}, typSymbol(g.typ), g.name, g.status !== "aktiv" ? marke(g.status, "warn") : null,

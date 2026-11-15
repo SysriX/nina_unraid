@@ -1,4 +1,4 @@
-/* NetInventory – Ansichten: Agenten, Sensor-Erkennung, Einstellungen, Benutzer & API, Protokoll */
+/* NINA – Ansichten: Agenten, Sensor-Erkennung, Einstellungen, Benutzer & API, Protokoll */
 "use strict";
 
 // ------------------------------------------------------------------ Agenten
@@ -10,7 +10,7 @@ ANSICHT.agenten = { titel: "HASS.Agent", async zeigen(main) {
       h("div", { class: "karte" }, h("h2", {}, "MQTT-Verbindung", m.verbunden ? marke("verbunden", "ok") : m.aktiv ? marke("getrennt", "bad") : marke("aus"),
         h("span", { class: "rechts" }, darf("admin") ? h("a", { href: "#einstellungen?tab=mqtt" }, h("button", { class: "klein" }, "Einstellungen")) : null)),
         h("p", { class: "leise", style: { margin: 0 } }, m.aktiv ? `${m.host} · ${m.status} · ${m.nachrichten} Nachrichten empfangen`
-          : "Noch nicht eingerichtet. HASS.Agent schickt seine Sensoren und Befehle an den MQTT-Broker von Home Assistant (z. B. das Mosquitto-Add-on). NetInventory hört dort mit – unter Einstellungen › MQTT den Broker eintragen.")),
+          : "Noch nicht eingerichtet. HASS.Agent schickt seine Sensoren und Befehle an den MQTT-Broker von Home Assistant (z. B. das Mosquitto-Add-on). NINA hört dort mit – unter Einstellungen › MQTT den Broker eintragen.")),
       h("div", { class: "karte" }, h("h2", {}, `${d.agenten.length} Agenten`),
         tabelle([
           { t: "", w: a => punkt(a.online ? "ok" : "") },
@@ -74,7 +74,7 @@ async function musterDialog(m) {
       feld("Reihenfolge", eingabe("reihenfolge", m.reihenfolge, { type: "number" })),
       feld("Bezeichnung", eingabe("bezeichnung", m.bezeichnung, { placeholder: "Anzeigename (leer = Name des Sensors)" })),
       feld("Kategorie", eingabe("kategorie", m.kategorie, { placeholder: sensor ? "cpu, speicher, benutzer …" : "shutdown, restart, lock …" }),
-        sensor ? "„benutzer“ = angemeldeter Benutzer in der Geräteliste" : "Für Automationen: netinventory.command mit command: <kategorie>"),
+        sensor ? "„benutzer“ = angemeldeter Benutzer in der Geräteliste" : "Für Automationen: nina_inventory.command mit command: <kategorie>"),
       sensor ? feld("Einheit", eingabe("einheit", m.einheit, { placeholder: "%, °C, GB" })) : null,
       sensor ? feld("Geräteklasse (HA)", eingabe("device_class", m.device_class, { placeholder: "temperature, timestamp, battery …" })) : null,
       sensor ? feld("state_class (HA)", auswahl("state_class", ["", "measurement", "total", "total_increasing"], m.state_class)) : null,
@@ -136,11 +136,11 @@ function mqttTab(m) {
       feld("Benutzer", eingabe("benutzer", m.benutzer, { autocomplete: "off" })),
       feld("Passwort", eingabe("passwort", "", { type: "password", autocomplete: "new-password", placeholder: m.passwort_gesetzt ? "•••••• (unverändert)" : "" })),
       feld("Discovery-Präfix", eingabe("praefix", m.praefix)),
-      feld("Client-ID", eingabe("client_id", m.client_id, { placeholder: "leer = netinventory-<id>" })),
+      feld("Client-ID", eingabe("client_id", m.client_id, { placeholder: "leer = nina-<id>" })),
       feld("Erkennung (Regex)", eingabe("erkennung", m.erkennung), "trifft auf identifiers/Hersteller/Modell/Version des Discovery-Geräts")),
     h("div", { class: "raster" }, haken("TLS", m.tls, null, "tls").el, haken("Zertifikat prüfen", m.tls_pruefen, null, "tls_pruefen").el));
   return h("div", {}, h("div", { class: "karte" }, h("h2", {}, "MQTT / HASS.Agent"),
-    h("p", { class: "leise klein-t" }, "Im Mosquitto-Add-on von Home Assistant am besten einen eigenen Benutzer für NetInventory anlegen. Unterstützt den klassischen HASS.Agent (MQTT-Discovery) und HASS.Agent .NET10 (hass.agent/…). NetInventory liest mit und sendet Befehle wie Home Assistant – dessen eigene Integration bleibt unberührt."),
+    h("p", { class: "leise klein-t" }, "Im Mosquitto-Add-on von Home Assistant am besten einen eigenen Benutzer für NINA anlegen. Unterstützt den klassischen HASS.Agent (MQTT-Discovery) und HASS.Agent .NET10 (hass.agent/…). NINA liest mit und sendet Befehle wie Home Assistant – dessen eigene Integration bleibt unberührt."),
     f), h("div", { class: "leiste" }, h("span", { class: "rechts" }, h("button", { class: "p", onclick: async () => {
       const r = await versuch(() => api("POST", "/api/einstellungen/mqtt", lesenForm(f)));
       hinweis("Gespeichert – " + r.status); setTimeout(zeige, 2500);
@@ -182,7 +182,7 @@ function sicherungTab(s) {
       h("div", { class: "knopfreihe" },
         h("button", { class: "p", onclick: async () => {
           const r = await versuch(() => api("GET", "/api/sicherung", undefined, { roh: true }));
-          const b = await r.blob(); const a = h("a", { href: URL.createObjectURL(b), download: (r.headers.get("content-disposition") || "").split('"')[1] || "netinventory.json" });
+          const b = await r.blob(); const a = h("a", { href: URL.createObjectURL(b), download: (r.headers.get("content-disposition") || "").split('"')[1] || "nina.json" });
           document.body.append(a); a.click(); a.remove();
         } }, "Sicherung herunterladen")),
       h("h4", {}, "Wiederherstellen"), h("div", { class: "leiste" }, datei, h("button", { class: "gefahr", onclick: async () => {
@@ -204,7 +204,7 @@ ANSICHT.benutzer = { titel: "Benutzer & API", async zeigen(main) {
         { t: "Letzte Anmeldung", w: x => datum(x.letzte_anmeldung) }], b.benutzer, { klick: x => benutzerDialog(x) }),
       h("p", { class: "leise klein-t" }, "leser: nur ansehen · operator: wecken, Befehle, Scans, Geräte bearbeiten · admin: alles")),
     h("div", { class: "karte" }, h("h2", {}, "API-Schlüssel (Home Assistant)", h("span", { class: "rechts" }, h("button", { class: "p klein", onclick: schluesselDialog }, "Schlüssel erzeugen"))),
-      h("p", { class: "leise klein-t" }, `Home Assistant findet NetInventory automatisch (mDNS: ${sys.mdns}). Beim Hinzufügen der Integration „NetInventory“ fragt sie nach einem dieser Schlüssel. Adresse für die manuelle Einrichtung: ${location.host}`),
+      h("p", { class: "leise klein-t" }, `Home Assistant findet NINA automatisch (mDNS: ${sys.mdns}). Beim Hinzufügen der Integration „NINA“ fragt sie nach einem dieser Schlüssel. Adresse für die manuelle Einrichtung: ${location.host}`),
       tabelle([{ t: "Name", w: x => x.name }, { t: "Beginnt mit", w: x => h("span", { class: "mono" }, x.anfang + "…") }, { t: "Rolle", w: x => marke(x.rolle) },
         { t: "Zuletzt benutzt", w: x => x.zuletzt ? `${vorZeit(x.zuletzt)} (${x.zuletzt_ip})` : "nie" },
         { t: "", w: x => h("button", { class: "klein gefahr", onclick: async () => { if (await bestaetigen(`Schlüssel „${x.name}“ löschen? Programme damit verlieren den Zugang.`, "Löschen")) { await versuch(() => api("DELETE", `/api/schluessel/${x.id}`), "Gelöscht"); zeige(); } } }, "Löschen") }],

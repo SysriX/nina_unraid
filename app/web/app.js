@@ -1,10 +1,10 @@
-/* NetInventory – Oberfläche: Kern, Navigation, Anmeldung, Einrichtung */
+/* NINA – Oberfläche: Kern, Navigation, Anmeldung, Einrichtung */
 "use strict";
 
 // ------------------------------------------------------------------ Hilfen
 const $ = (s, r = document) => r.querySelector(s);
 const ANSICHT = {};
-let ICH = null, META = { typen: [], zusatzfelder: [], name: "NetInventory" };
+let ICH = null, META = { typen: [], zusatzfelder: [], name: "NINA" };
 
 function h(tag, attrs, ...kinder) {
   const el = document.createElement(tag);
@@ -140,7 +140,7 @@ function tabs(namen, aktiv, wechsel) {
 }
 function themeWahl(klasse = "") {
   return h("select", { class: "theme-wahl " + klasse, title: "Aussehen", onchange: e => themeSetzen(e.target.value) },
-    window.NI_THEMES.map(([k, t]) => h("option", { value: k, selected: k === themeAktuell() }, t)));
+    window.NINA_THEMES.map(([k, t]) => h("option", { value: k, selected: k === themeAktuell() }, t)));
 }
 function kopieren(text) {
   if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text).then(() => hinweis("Kopiert"));
@@ -164,7 +164,7 @@ function aktuelleRoute() { const [n, q] = location.hash.slice(1).split("?"); ret
 function rahmen() {
   const r = aktuelleRoute();
   const navi = h("aside", { id: "navi" },
-    h("div", { class: "logo" }, h("img", { src: "/static/icon.svg", alt: "" }), h("div", {}, h("b", {}, "NETINVENTORY"), h("small", {}, META.name !== "NetInventory" ? META.name : "Netzwerk · Geräte · Agenten"))),
+    h("div", { class: "logo" }, h("img", { src: "/static/icon.svg", alt: "" }), h("div", {}, h("b", {}, "NINA"), h("small", {}, META.name !== "NINA" ? META.name : "Network INventory Assistant"))),
     NAVI.map(([gruppe, eintraege]) => [gruppe ? h("h4", {}, gruppe) : null,
       eintraege.filter(([, , , rolle]) => !rolle || darf(rolle)).map(([k, t, , , zahl]) =>
         h("a", { class: "nav" + (r.name === k || (k === "geraete" && r.name === "geraet") ? " an" : ""), href: "#" + k,
@@ -188,7 +188,7 @@ async function zeige() {
   await zahlenLaden();
   const main = rahmen();
   $("#titel").textContent = a.titel;
-  document.title = `${a.titel} – NetInventory`;
+  document.title = `${a.titel} – NINA`;
   main.append(h("div", { class: "leer" }, "Lädt …"));
   try { await a.zeigen(main, r.q); }
   catch (e) { leeren(main, h("div", { class: "karte" }, h("h2", {}, punkt("bad"), "Fehler"), h("pre", {}, e.message))); }
@@ -216,7 +216,7 @@ async function start() {
 }
 
 function logoGross(unter) {
-  return h("div", { class: "logo-gross" }, h("img", { src: "/static/icon.svg", alt: "", class: "symbol" }), h("h1", {}, "NETINVENTORY"), h("div", {}, unter));
+  return h("div", { class: "logo-gross" }, h("img", { src: "/static/icon.svg", alt: "", class: "symbol" }), h("h1", {}, "NINA"), h("div", {}, unter));
 }
 
 // ------------------------------------------------------------------ Anmeldung
@@ -229,7 +229,7 @@ function zeigeAnmeldung() {
     feld("Benutzer", eingabe("benutzer", "", { autocomplete: "username", required: true })),
     feld("Passwort", eingabe("passwort", "", { type: "password", autocomplete: "current-password", required: true })),
     h("button", { class: "p voll", type: "submit" }, "Anmelden"));
-  leeren($("#app"), h("div", { class: "ecke" }, themeWahl()), h("div", { class: "mitte" }, logoGross("Netzwerk- und IT-Geräteliste"), h("div", { class: "karte" }, f)));
+  leeren($("#app"), h("div", { class: "ecke" }, themeWahl()), h("div", { class: "mitte" }, logoGross("Network INventory Assistant"), h("div", { class: "karte" }, f)));
 }
 
 async function eigenesPasswort() {
@@ -260,7 +260,7 @@ const SCHRITT = [
   z => {
     const i = eingabe("code", E.code, { placeholder: "XXXX-XXXX-XXXX", style: { fontFamily: "monospace", fontSize: "18px", textAlign: "center" } });
     return [h("h2", {}, "Willkommen"),
-      h("p", {}, "NetInventory wird zum ersten Mal gestartet. Zum Schutz steht ein Einrichtungs-Code im Log des Containers (Unraid: Docker › NetInventory › Logs) und in /config/einrichtungs-code.txt."),
+      h("p", {}, "NINA wird zum ersten Mal gestartet. Zum Schutz steht ein Einrichtungs-Code im Log des Containers (Unraid: Docker › NINA › Logs) und in /config/einrichtungs-code.txt."),
       feld("Einrichtungs-Code", i),
       h("div", { class: "leiste" }, h("span", { class: "rechts" }, h("button", { class: "p", onclick: async () => {
         E.code = i.value.trim().toUpperCase();
@@ -277,7 +277,7 @@ const SCHRITT = [
         .map(([v, t, b]) => h("label", {}, h("input", { type: "radio", name: "typ", value: v, checked: typ === v, onchange: () => { E.dbTyp = v; z(); } }), h("span", { class: "t" }, t), h("div", { class: "b" }, b))));
     const md = h("div", { class: typ === "mariadb" ? "" : "versteckt" },
       h("div", { class: "raster" }, feld("Server", eingabe("host", "", { placeholder: "<IP_MariaDB>" })), feld("Port", eingabe("port", "3306")),
-        feld("Datenbank", eingabe("name", "netinventory")), feld("Benutzer", eingabe("benutzer", "netinventory")), feld("Passwort", eingabe("passwort", "", { type: "password" }))));
+        feld("Datenbank", eingabe("name", "nina")), feld("Benutzer", eingabe("benutzer", "nina")), feld("Passwort", eingabe("passwort", "", { type: "password" }))));
     const anl = haken("Datenbank und Benutzer jetzt anlegen (mit Root-Zugang)", false, "Nur wenn es sie noch nicht gibt. Der Root-Zugang wird nicht gespeichert.", "anlegen");
     const root = h("div", { class: "raster versteckt" }, feld("Root-Benutzer", eingabe("root_benutzer", "root")), feld("Root-Passwort", eingabe("root_passwort", "", { type: "password" })));
     anl.i.addEventListener("change", () => root.classList.toggle("versteckt", !anl.i.checked));

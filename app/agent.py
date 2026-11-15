@@ -2,7 +2,7 @@
 
 HASS.Agent (2.x, .NET) meldet sich mit MQTT-Discovery beim Broker von Home Assistant an:
   <präfix>/<komponente>/<gerät>/<objekt>/config   (Sensoren, binäre Sensoren, Knöpfe, Schalter …)
-NetInventory hört mit (nur lesend) und schickt Befehle auf das command_topic – genau wie Home Assistant.
+NINA hört mit (nur lesend) und schickt Befehle auf das command_topic – genau wie Home Assistant.
 Erkannt wird ein Agent am Gerät der Discovery (identifiers/manufacturer/model/sw_version passt zum Erkennungs-Muster).
 """
 from __future__ import annotations
@@ -136,7 +136,7 @@ class Dienst:
         except re.error:
             self._re = re.compile(STANDARD_MQTT["erkennung"], re.I)
         import paho.mqtt.client as mqtt
-        cid = k.get("client_id") or f"netinventory-{kern.instanz_id()}"
+        cid = k.get("client_id") or f"nina-{kern.instanz_id()}"
         c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=cid, clean_session=True)
         if g.get("benutzer"):
             c.username_pw_set(g["benutzer"], g.get("passwort") or None)
@@ -787,7 +787,7 @@ def befehl(gid: int, befehl_name: str, wer: str, ip: str = "", wert=None) -> dic
                 daten = {"command": treffer.schluessel[7:]}
             elif treffer.schluessel in ("shutdown", "restart"):
                 verz = int(wert) if str(wert or "").strip().isdigit() else 60
-                daten = {"command": treffer.schluessel, "force": False, "time": verz, "comment": f"NetInventory ({wer})"}
+                daten = {"command": treffer.schluessel, "force": False, "time": verz, "comment": f"NINA ({wer})"}
             elif treffer.schluessel == "restart_cancel":
                 daten = {"restart_cancel": True}
             else:
