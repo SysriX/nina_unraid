@@ -364,3 +364,32 @@ async def alle_aufheben(req: Request, ich: dict = Depends(ADMIN)):
     protokoll(ich["name"], "zuweisung", "alle Zuweisungen aufgehoben", details=f"{len(ids)} Geräte → {funde_n} Funde, Sicherung {sicherung}",
               ip=client_ip(req))
     return {"ok": True, "geraete": len(ids), "funde": funde_n, "sicherung": sicherung}
+
+
+# ------------------------------------------------------------------ Sammel-Aktionen (Mehrfachauswahl)
+@router.post("/funde/sammel")
+async def sammel(req: Request, ich: dict = Depends(OPERATOR)):
+    """{aktion: ignorieren | anzeigen | entfernen, ids: [...]}.
+    Entfernen löscht Funde (tauchen beim nächsten Scan wieder auf, wenn das Gerät noch da ist). HASS.Agent-Funde werden
+    dabei übersprungen – ein laufender Agent meldet sich sofort wieder; für die gibt es „Ignorieren“."""
+    d = await req.json()
+    aktion, ids = d.get("aktion"), [int(i) for i in d.get("ids") or []]
+    if aktion not in ("ignorieren", "anzeigen", "entfernen"):
+        raise HTTPException(400, "Unbekannte Aktion")
+    erledigt, agenten = 0, 0
+    with sitzung() as s:
+        for fid in ids:
+            f = s.get(Fund, fid)
+            if not f:
+                continue
+            if aktion in ("ignorieren", "anzeigen"):
+                f.ignoriert = aktion == "ignorieren"
+                erledigt += 1
+            elif f.agent_id:
+                agenten += 1
+            else:
+                s.delete(f)
+                erledigt += 1
+    protokoll(ich["name"], "funde", f"Sammel-Aktion {aktion}", details=f"{erledigt} Funde, {agenten} HASS.Agent übersprungen",
+              ip=client_ip(req))
+    return {"ok": True, "erledigt": erledigt, "agenten_uebersprungen": agenten}

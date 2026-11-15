@@ -92,9 +92,9 @@ function lesenForm(el) {
 }
 
 /** Tabelle: spalten = [{t, w: zeile => wert|Node, z: rechtsbündig, sort: zeile => Sortierwert}] */
-function tabelle(spalten, zeilen, { klick, leer = "Keine Einträge", an, sortierbar } = {}) {
+function tabelle(spalten, zeilen, { klick, leer = "Keine Einträge", an, sortierbar, klebend } = {}) {
   if (!zeilen || !zeilen.length) return h("div", { class: "leer" }, leer);
-  const wrap = h("div", { class: "tab-wrap" });
+  const wrap = h("div", { class: "tab-wrap" + (klebend ? " klebend" : "") });   // klebend: letzte Spalte (Knöpfe) bleibt rechts sichtbar
   let sortSp = null, auf = true;
   const zeichnen = () => {
     let z = zeilen.slice();

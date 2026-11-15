@@ -71,7 +71,7 @@ ANSICHT.geraete = { titel: "Geräte", async zeigen(main, q) {
         { t: "Hersteller / Modell", w: g => [g.hersteller, g.modell].filter(Boolean).join(" · ") },
         { t: "", w: g => [g.agent ? marke("Agent", g.agent.online ? "ok" : "") : null, " ", g.wol && !g.online && darf("operator") ? h("button", { class: "klein", title: "Wake-on-LAN", onclick: () => wecken(g) }, "Wecken") : null] },
         { t: "Zuletzt online", w: g => g.online ? "jetzt" : vorZeit(g.zuletzt_online), sort: g => g.online ? "9" : g.zuletzt_online || "" },
-      ], liste, { klick: g => (location.hash = `#geraet?id=${g.id}`), leer: daten.length ? "Kein Gerät passt zum Filter" : "Noch keine Geräte – Netzwerk anlegen und scannen oder von Hand hinzufügen", sortierbar: true })));
+      ], liste, { klick: g => (location.hash = `#geraet?id=${g.id}`), leer: daten.length ? "Kein Gerät passt zum Filter" : "Noch keine Geräte – Netzwerk anlegen und scannen oder von Hand hinzufügen", sortierbar: true, klebend: true })));
   };
   const laden = async () => { daten = (await api("GET", `/api/geraete?status=${FILTER.status}`)).geraete; zeichnen(); };
   const netze = [...new Set((await api("GET", "/api/netzwerke")).netzwerke.map(n => n.name))];
@@ -254,25 +254,55 @@ const QUELLE_NAMEN = { scan: "Netzwerk-Scan", opnsense: "OPNsense", agent: "HASS
 let QUELLE_FILTER = "";
 const quellenMarken = qs => (qs || []).map(q => marke(QUELLE_NAMEN[q] || q, q === "agent" ? "akz" : ""));
 
+const AUSWAHL = new Set();      // markierte Funde (bleibt beim Aktualisieren erhalten)
+
 ANSICHT.neu = { titel: "Nicht zugewiesen", async zeigen(main) {
+  let st = null;
   const laden = async () => {
     const ign = QUELLE_FILTER === "ignoriert";
     const [d, akt] = await Promise.all([api("GET", `/api/funde?ignoriert=${ign ? 1 : 0}`), api("GET", "/api/geraete?status=aktiv")]);
     const alle_ = d.funde;
     if (!ign) ZAHLEN.neu = alle_.length;
-    const anzahl = q => alle_.filter(f => f.quellen.includes(q)).length;
     const liste = ign || !QUELLE_FILTER ? alle_ : alle_.filter(f => f.quellen.includes(QUELLE_FILTER));
+    const sichtbar = new Set(liste.map(f => f.id));
+    for (const id of [...AUSWAHL]) if (!sichtbar.has(id)) AUSWAHL.delete(id);
+    st = { ign, alle_, liste, akt };
+    zeichnen();
+  };
+  const sammel = async (aktion, text, gefahr) => {
+    const ids = [...AUSWAHL];
+    if (!ids.length) return;
+    if (!(await bestaetigen(text, aktion === "entfernen" ? "Entfernen" : aktion === "ignorieren" ? "Ignorieren" : "Anzeigen", gefahr))) return;
+    const r = await versuch(() => api("POST", "/api/funde/sammel", { aktion, ids }));
+    hinweis(`${r.erledigt} erledigt` + (r.agenten_uebersprungen ? ` – ${r.agenten_uebersprungen} HASS.Agent übersprungen (die lassen sich nur ignorieren, ein laufender Agent meldet sich sonst sofort wieder)` : ""));
+    AUSWAHL.clear(); laden();
+  };
+  const zeichnen = () => {
+    const { ign, alle_, liste, akt } = st;
+    const anzahl = q => alle_.filter(f => f.quellen.includes(q)).length;
+    const markiert = liste.filter(f => AUSWAHL.has(f.id));
+    const alleMarkiert = liste.length > 0 && markiert.length === liste.length;
+    const kopfKasten = h("input", { type: "checkbox", title: "alle angezeigten markieren", checked: alleMarkiert, onclick: e => e.stopPropagation(),
+      onchange: e => { for (const f of liste) e.target.checked ? AUSWAHL.add(f.id) : AUSWAHL.delete(f.id); zeichnen(); } });
+    if (markiert.length && !alleMarkiert) kopfKasten.indeterminate = true;
+    const leiste = markiert.length && darf("operator") ? h("div", { class: "auswahl-leiste" },
+      h("b", {}, `${markiert.length} markiert`),
+      ign ? h("button", { class: "klein", onclick: () => sammel("anzeigen", `${markiert.length} Funde wieder anzeigen?`, false) }, "Wieder anzeigen") : [
+        h("button", { class: "klein p", onclick: () => zuweisenDialog(markiert[0], markiert.slice(1).map(f => f.id)).then(r => { if (r) AUSWAHL.clear(); laden(); }) },
+          markiert.length > 1 ? "Zusammen zuweisen" : "Zuweisen"),
+        h("button", { class: "klein", onclick: () => sammel("ignorieren", `${markiert.length} Funde ignorieren? Sie stehen dann unter „Ignoriert“ und tauchen hier nicht wieder auf.`, false) }, "Ignorieren")],
+      h("button", { class: "klein gefahr", onclick: () => sammel("entfernen", `${markiert.length} Funde entfernen? Geräte, die noch im Netz sind, tauchen beim nächsten Scan wieder auf. HASS.Agent-Funde werden übersprungen.`, true) }, "Entfernen"),
+      h("button", { class: "klein", onclick: () => { AUSWAHL.clear(); zeichnen(); } }, "Auswahl aufheben")) : null;
     leeren(main,
-      h("p", { class: "leise" }, "Alles, was Netzwerk-Scan, OPNsense oder ein HASS.Agent gefunden hat, steht hier – auch wenn mehrere Quellen dasselbe Gerät melden. Ins Inventar (Geräte) kommt ein Fund nur über „Zuweisen“; dabei lassen sich mehrere Funde zu einem Gerät zusammenführen."),
+      h("p", { class: "leise" }, "Alles, was Netzwerk-Scan, OPNsense oder ein HASS.Agent gefunden hat, steht hier – auch wenn mehrere Quellen dasselbe Gerät melden. Ins Inventar (Geräte) kommt ein Fund nur über „Zuweisen“; dabei lassen sich mehrere Funde zu einem Gerät zusammenführen. Mit den Kästchen lassen sich mehrere Funde auf einmal bearbeiten."),
       h("div", { class: "leiste" }, h("div", { class: "tabs" }, [["", `Alle (${ign ? "…" : alle_.length})`], ["scan", `Netzwerk-Scan (${ign ? "…" : anzahl("scan")})`],
         ["opnsense", `OPNsense (${ign ? "…" : anzahl("opnsense")})`], ["agent", `HASS.Agent (${ign ? "…" : anzahl("agent")})`], ["ignoriert", "Ignoriert"]].map(([k, t]) =>
-        h("button", { class: k === QUELLE_FILTER ? "an" : "", onclick: () => { QUELLE_FILTER = k; laden(); } }, t))),
+        h("button", { class: k === QUELLE_FILTER ? "an" : "", onclick: () => { QUELLE_FILTER = k; AUSWAHL.clear(); laden(); } }, t))),
         h("span", { class: "rechts" }, h("a", { href: "#einstellungen?tab=zeitplan" }, h("button", { class: "klein" }, "Zeitplan der Suche")))),
-      h("div", { class: "karte" }, h("h2", {}, ign ? `${liste.length} ignoriert` : `${liste.length} nicht zugewiesen`,
-        !ign && liste.length && darf("operator") ? h("span", { class: "rechts" }, h("button", { class: "klein", onclick: async () => {
-          if (!(await bestaetigen(`Alle ${liste.length} angezeigten Funde ignorieren?`, "Ignorieren"))) return;
-          for (const f of liste) await api("POST", `/api/funde/${f.id}/ignorieren`, { an: true }); laden(); } }, "Alle ignorieren")) : null),
+      h("div", { class: "karte" }, h("h2", {}, ign ? `${liste.length} ignoriert` : `${liste.length} nicht zugewiesen`), leiste,
         tabelle([
+          ...(darf("operator") ? [{ t: kopfKasten, w: f => h("input", { type: "checkbox", checked: AUSWAHL.has(f.id),
+              onchange: e => { e.target.checked ? AUSWAHL.add(f.id) : AUSWAHL.delete(f.id); zeichnen(); } }) }] : []),
           { t: "", w: f => punkt(f.online ? "ok" : "") },
           { t: "Name", w: f => h("div", { class: "zwei-zeilen" }, h("b", {}, f.name || f.ip || f.mac),
               f.agent ? h("small", {}, `HASS.Agent ${f.agent.name} ${f.agent.version || ""}`) : f.hostname && f.hostname.split(".")[0].toLowerCase() !== (f.name || "").toLowerCase() ? h("small", {}, f.hostname) : null,
@@ -288,17 +318,20 @@ ANSICHT.neu = { titel: "Nicht zugewiesen", async zeigen(main) {
               h("button", { class: "klein p", onclick: () => zuweisenDialog(f).then(() => laden()) }, "Zuweisen"),
               h("button", { class: "klein", onclick: () => zuGeraetDialog(f, akt.geraete).then(r => r && laden()) }, "Zu Gerät hinzufügen"),
               h("button", { class: "klein", onclick: async () => { await api("POST", `/api/funde/${f.id}/ignorieren`, { an: true }); laden(); } }, "Ignorieren")]) : null },
-        ], liste, { leer: ign ? "Nichts ignoriert." : alle_.length ? "Für diese Quelle gibt es nichts." : "Nichts offen – alles zugewiesen.", sortierbar: true })));
+        ], liste, { leer: ign ? "Nichts ignoriert." : alle_.length ? "Für diese Quelle gibt es nichts." : "Nichts offen – alles zugewiesen.", sortierbar: true, klebend: true,
+          an: f => AUSWAHL.has(f.id) })));
   };
   await laden();
   alle(30, laden);
 } };
 
 /** Fund zuweisen: neues Gerät anlegen (oder in ein Inventar-Gerät) und weitere Funde gleich mit zusammenführen. */
-async function zuweisenDialog(f) {
+async function zuweisenDialog(f, vorgewaehlt = []) {
   const [v, kat] = await Promise.all([api("GET", `/api/funde/${f.id}/vorschlaege`), katalogLaden(true)]);
   const vor = f.vorher || {};
-  const wahl = new Set(v.vorschlaege.filter(x => x.art === "fund" && x.gruende.length).map(x => x.id));
+  // markierte Funde aus der Liste + was über Name/IP/MAC passt; markierte stehen oben
+  const wahl = new Set([...vorgewaehlt, ...v.vorschlaege.filter(x => x.art === "fund" && x.gruende.length).map(x => x.id)]);
+  if (vorgewaehlt.length) v.vorschlaege.sort((a, b) => vorgewaehlt.includes(b.id) - vorgewaehlt.includes(a.id));
   let ziel = null, formular = null;
   const th = typHerstellerFelder({ typ: vor.typ || f.typ, typen: vor.typen || [f.typ], hersteller: vor.hersteller || f.hersteller, modell: vor.modell || f.modell }, kat);
   const kopf = h("div", { class: "raster" },

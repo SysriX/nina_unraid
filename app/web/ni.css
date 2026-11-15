@@ -179,3 +179,12 @@ aside{display:flex;flex-direction:column}
 .navi-system a.nav{font-size:13px;padding:6px 10px}
 [data-stil=konsole] .navi-system{background:rgba(0,0,0,.32);box-shadow:inset 0 2px 6px rgba(0,0,0,.55),0 -1px 0 rgba(255,255,255,.04);border-top:1px solid rgba(255,255,255,.05)}
 .tab-wrap td .knopfreihe{flex-wrap:nowrap}
+
+.auswahl-leiste{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 10px;margin:-4px 0 10px;border-radius:10px;background:color-mix(in srgb,var(--akzent) 12%,transparent);border:1px solid color-mix(in srgb,var(--akzent) 35%,transparent)}
+.auswahl-leiste b{margin-right:6px}
+
+/* breite Listen: Seite breiter nutzen, Knopfspalte rechts immer sichtbar */
+main{max-width:1680px}
+.tab-wrap.klebend th:last-child,.tab-wrap.klebend td:last-child{position:sticky;right:0;z-index:1;background:var(--karte);box-shadow:-10px 0 12px -10px rgba(0,0,0,.6)}
+[data-stil=konsole] .tab-wrap.klebend th:last-child,[data-stil=konsole] .tab-wrap.klebend td:last-child{background:#1c1d21}
+.tab-wrap.klebend tr.an td:last-child{background:color-mix(in srgb,var(--akzent) 9%,var(--karte))}

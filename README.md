@@ -13,6 +13,8 @@ Home-Assistant-Integration: [nina_ha_integration](https://github.com/SysriX/nina
 ![Nicht zugewiesene Funde aus Scan, OPNsense und HASS.Agent](docs/images/neu.png)
 *Beispieldaten*
 
+> **2.1.0:** Mehrfachauswahl unter „Nicht zugewiesen“ (zusammen zuweisen, ignorieren, wieder anzeigen, entfernen); Knopfspalte breiter Listen bleibt rechts sichtbar.
+>
 > **2.0.1:** Anzeige mehrerer Typen korrigiert (Haupttyp steht immer zuerst, kein Typ fällt mehr weg).
 >
 > **Stand 2.0.0:** Nicht zugewiesene Funde in **eigener Tabelle**: Netzwerk-Scan, OPNsense und HASS.Agent schreiben nur noch Funde (mit Vermerk, wer sie erkannt hat); unter „Geräte“ steht nur, was zugewiesen wurde – einzeln oder mehrere Funde zusammengeführt, neu oder zu einem vorhandenen Gerät. HASS.Agents werden nie automatisch zugewiesen. **Zuweisung aufheben** je Gerät und **„Alle Zuweisungen aufheben“** (Einstellungen › Datenbank & Sicherung, mit Sicherung vorher) für einen sauberen Neustart; die alten Angaben bleiben am Fund vorgemerkt. Wake-on-LAN: **eigene WoL-MAC je Gerät** (z. B. Onboard-Karte neben einer 10-Gbit-Karte), Warnung bei Karten ohne WoL, zusätzlich Port 7 und rohes Ethernet-Paket. Datenbank-Update Schema 2 → 3 mit einer Kopie echter Daten getestet.
