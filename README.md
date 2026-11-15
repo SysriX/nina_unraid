@@ -13,6 +13,8 @@ Home-Assistant-Integration: [nina_ha_integration](https://github.com/SysriX/nina
 ![Nicht zugewiesene Funde aus Scan, OPNsense und HASS.Agent](docs/images/neu.png)
 *Beispieldaten*
 
+> **2.4.0:** Home-Assistant-Schnittstelle: `POST /api/ha/v1/aufgabe/{scan|opnsense|agent}` und `aufgaben` in `/info` – die HA-Integration 1.2.0 legt damit ein Gerät „NINA“ mit Knöpfen für Netzwerk-Scan, OPNsense-Abfrage und Agent-Abgleich an. In HA erscheinen außerdem die HASS.Agent-.NET10-Befehle (Herunterfahren, Neustart, Update …) als Knöpfe.
+>
 > **2.3.0:** Geräteliste nach Haupttyp gruppiert (Reihenfolge wie im Typen-Katalog), Gruppen auf- und zuklappbar, Anzahl online je Gruppe; Gruppierung abschaltbar. Einstellung bleibt im Browser gespeichert.
 >
 > **2.2.2:** Modell-Vorschläge zeigen immer den Hersteller mit (z. B. „U6-Lite – Ubiquiti · Switch / Access-Point“), Hersteller-Vorschläge „2 Modelle passend zum Typ“.

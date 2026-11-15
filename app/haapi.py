@@ -25,7 +25,29 @@ def info(ich: dict = Depends(LESER)):
     with sitzung() as s:
         typen = [{"schluessel": t.schluessel, "name": t.name, "icon": t.icon} for t in katalog.typen(s)]
     return {"id": kern.instanz_id(), "name": inventar.allgemein()["name"], "version": kern.VERSION, "api": API_VERSION,
-            "schema": migrationen.AKTUELL, "rolle": ich["rolle"], "typen": typen}
+            "schema": migrationen.AKTUELL, "rolle": ich["rolle"], "typen": typen, "aufgaben": _aufgaben()}
+
+
+def _aufgaben() -> list[dict]:
+    """Was HA als Knopf am NINA-Gerät anbietet (ab 2.4.0)."""
+    import opnsense
+    import zeitplan
+    out = [{"schluessel": "scan", "name": zeitplan.QUELLEN["scan"], "icon": "mdi:lan-pending"}]
+    if opnsense.eingerichtet():
+        out.append({"schluessel": "opnsense", "name": zeitplan.QUELLEN["opnsense"], "icon": "mdi:router-network"})
+    out.append({"schluessel": "agent", "name": zeitplan.QUELLEN["agent"], "icon": "mdi:monitor-account"})
+    return out
+
+
+@router.post("/aufgabe/{quelle}")
+async def aufgabe(quelle: str, ich: dict = Depends(OPERATOR)):
+    """Netzwerk-Scan, OPNsense-Abfrage oder Agent-Abgleich jetzt ausführen (wie „Jetzt ausführen“ im Zeitplan)."""
+    import asyncio
+    import zeitplan
+    if quelle not in zeitplan.QUELLEN:
+        raise LookupError("Unbekannte Aufgabe")
+    z = await asyncio.to_thread(zeitplan.ausfuehren, quelle, ich["name"])
+    return {"ok": z["ok"], "ergebnis": z["ergebnis"], "dauer": z["dauer"]}
 
 
 def _ha_geraet(s, g: Geraet, d: dict) -> dict:
