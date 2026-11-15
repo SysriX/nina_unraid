@@ -33,12 +33,12 @@ function typHerstellerFelder(w, kat) {
     const passt = m => !m.typ || t.has(m.typ);
     const hs = kat.hersteller.map(x => ({ x, treffer: x.modelle.some(m => m.typ && t.has(m.typ)) }))
       .sort((a, b) => (b.treffer - a.treffer) || a.x.name.localeCompare(b.x.name, "de"));
-    hVor = hs.map(({ x, treffer }) => ({ wert: x.name, info: treffer ? `${x.modelle.filter(m => m.typ && t.has(m.typ)).length} passende Modelle` : `${x.modelle.length} Modelle`,
+    hVor = hs.map(({ x, treffer }) => ({ wert: x.name, info: (n => `${n} ${n === 1 ? "Modell" : "Modelle"}${treffer ? " passend zum Typ" : ""}`)(treffer ? x.modelle.filter(m => m.typ && t.has(m.typ)).length : x.modelle.length),
       gruppe: hs.some(y => y.treffer) ? (treffer ? "Passend zum Typ" : "Weitere Hersteller") : "" }));
     const her = kat.hersteller.find(x => x.name.toLowerCase() === hn);
     const ms = her ? her.modelle.map(m => ({ m, h: her })) : kat.hersteller.flatMap(x => x.modelle.filter(m => m.typ && t.has(m.typ)).map(m => ({ m, h: x })));
     ms.sort((a, b) => (passt(b.m) - passt(a.m)) || a.m.name.localeCompare(b.m.name, "de"));
-    mVor = ms.map(({ m, h: x }) => ({ wert: m.name, info: [her ? "" : x.name, m.typ ? typName(m.typ) : ""].filter(Boolean).join(" · ") }));
+    mVor = ms.map(({ m, h: x }) => ({ wert: m.name, info: [x.name, m.typ ? typName(m.typ) : ""].filter(Boolean).join(" · ") }));
     hinweis.textContent = her ? `${her.modelle.length} Modelle von ${her.name} im Katalog` : (hn ? "neuer Hersteller – wird beim Speichern in den Katalog übernommen" : "");
   };
   mIn.addEventListener("change", () => {     // Modell gewählt: Hersteller und Typ ergänzen
