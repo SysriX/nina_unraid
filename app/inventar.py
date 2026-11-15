@@ -363,6 +363,7 @@ def geraet_json(s, g: Geraet, detail: bool = False, netze: dict | None = None, a
     if tnamen is None:
         tnamen = typnamen(s)
     typen = (gtypen.get(g.id) if gtypen is not None else katalog.geraet_typen(s, g.id)) or [g.typ]
+    typen = [g.typ] + [k for k in typen if k != g.typ]      # Haupttyp immer zuerst, dann die weiteren
     if netze is None:
         netze = {n.id: n.name for n in s.scalars(select(Netzwerk))}
     schs = sorted(s.scalars(select(Schnittstelle).where(Schnittstelle.geraet_id == g.id)),
