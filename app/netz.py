@@ -73,6 +73,23 @@ def mac_hersteller(mac: str) -> str:
     return _hersteller.get(mac.replace(":", "")[:6].upper(), "")
 
 
+NIC_ARTEN = {"rj45": "RJ45", "10g": "10G / SFP+", "wifi": "WLAN", "virtuell": "virtuell"}
+
+
+def nic_art(text: str, hersteller: str = "", mac: str = "") -> str:
+    """Art einer Netzwerkkarte aus Adaptername/-beschreibung und MAC-Hersteller raten: rj45 | 10g | wifi | virtuell | ''."""
+    t = f"{text} {hersteller}".lower()
+    if re.search(r"wireguard|vpn|tap-|\btun\b|hyper-v|vethernet|virtual|virtualbox|vmware|docker|loopback|bluetooth|tailscale|zerotier|wan miniport|wi-fi direct", t):
+        return "virtuell"
+    if re.search(r"wi-?fi|wlan|wireless|802\.11|centrino|\bax2\d\d\b|\bac \d{4}\b|killer.*(1[5-6]\d\d|ax)", t):
+        return "wifi"
+    if re.search(r"\b10 ?g(b|be|bit)?\b|10-?gig|10 gigabit|82599|x5[2-5]0|x710|xxv710|connectx|mellanox|10gtek|chelsio|solarflare|aquantia|marvell aqc|sfp|25g|40g", t):
+        return "10g"
+    if re.search(r"ethernet|gbe|gigabit|\bi2[0-2]\d\b|i225|i226|realtek|rtl81|killer e|lan\b|2\.5 ?g|giga-?byte|asustek|micro-star|asrock|supermicro|broadcom netxtreme", t):
+        return "rj45"
+    return ""
+
+
 def nmap_da() -> bool:
     return bool(shutil.which("nmap"))
 

@@ -23,7 +23,8 @@ router = APIRouter(prefix="/api")
 def typnamen(s) -> dict[str, str]:
     return {t.schluessel: t.name for t in s.scalars(select(Typ))}
 
-STATUS = ("aktiv", "ausgemustert")     # Nicht zugewiesenes steht in ni_fund
+STATUS = ("aktiv", "ausgemustert")
+NIC_ARTEN = netz.NIC_ARTEN     # Nicht zugewiesenes steht in ni_fund
 
 STANDARD_ALLGEMEIN = {"name": "NINA", "neue_geraete": "pruefen", "ueberwachen_intervall": 60,
                       "wol_port": 9, "agent_geraete_anlegen": True, "ereignisse_tage": 90, "zusatzfelder": []}
@@ -282,6 +283,9 @@ def wol_ziel(s, g: Geraet) -> tuple[Schnittstelle | None, Netzwerk | None]:
                 (netzwerk_fuer_ip(list(s.scalars(select(Netzwerk))), x.ip) if x else None)
             return Schnittstelle(mac=g.wol_mac, ip=x.ip if x else ""), nw
         return None, None
+    # ohne eigene WoL-MAC: RJ45 zuerst (Onboard-Karte), unbekannt vor 10G, WLAN und virtuell zuletzt
+    rang = {"rj45": 0, "": 1, "10g": 2, "virtuell": 3, "wifi": 4}
+    schs.sort(key=lambda x: (rang.get(x.art or "", 1), not x.primaer, x.id))
     sch = schs[0]
     if g.wol_mac:                      # eigene WoL-MAC (z. B. Onboard-Karte ohne IP): Netz der passenden bzw. primären Schnittstelle
         sch = next((x for x in schs if x.mac == g.wol_mac), sch)
@@ -354,7 +358,8 @@ def wecken(gid: int, wer: str, ip: str = "") -> dict:
 def _sch_json(x: Schnittstelle, netze: dict) -> dict:
     return {"id": x.id, "name": x.name, "mac": x.mac, "ip": x.ip, "hostname": x.hostname, "mac_hersteller": x.mac_hersteller,
             "netzwerk_id": x.netzwerk_id, "netzwerk": netze.get(x.netzwerk_id, ""), "primaer": x.primaer,
-            "feste_ip": x.feste_ip, "quelle": x.quelle, "online": x.online, "erstmals": iso(x.erstmals), "zuletzt": iso(x.zuletzt)}
+            "feste_ip": x.feste_ip, "quelle": x.quelle, "online": x.online, "erstmals": iso(x.erstmals), "zuletzt": iso(x.zuletzt),
+            "art": x.art, "art_fest": x.art_fest, "beschreibung": x.beschreibung}
 
 
 def geraet_json(s, g: Geraet, detail: bool = False, netze: dict | None = None, agenten: dict | None = None,
@@ -385,8 +390,9 @@ def geraet_json(s, g: Geraet, detail: bool = False, netze: dict | None = None, a
         wsch, _ = wol_ziel(s, g)
         wmac = g.wol_mac or (wsch.mac if wsch else "")
         whst = netz.mac_hersteller(wmac) or next((x.mac_hersteller for x in schs if x.mac == wmac), "")
-        d.update({"wol_mac": g.wol_mac, "wol_mac_wirksam": wmac, "wol_mac_hersteller": whst,
-                  "wol_warnung": bool(re.search(r"10gtek|82599|mellanox|chelsio|solarflare|x520|x540|aquantia|marvell", whst, re.I)),
+        wart = next((x.art for x in schs if x.mac == wmac), "")
+        d.update({"wol_mac": g.wol_mac, "wol_mac_wirksam": wmac, "wol_mac_hersteller": whst, "wol_art": wart,
+                  "wol_warnung": wart in ("10g", "wifi", "virtuell") or bool(re.search(r"10gtek|82599|mellanox|chelsio|solarflare|x520|x540|aquantia|marvell", whst, re.I)),
                   "seriennummer": g.seriennummer, "inventarnummer": g.inventarnummer, "betriebssystem": g.betriebssystem,
                   "notizen": g.notizen, "extra": g.extra or {}, "wol_aktiv": g.wol_aktiv, "wol_methode": g.wol_methode,
                   "wol_methode_wirksam": wol_methode(g, wnw) if (g.wol_mac or any(x.mac for x in schs)) else "",
@@ -719,6 +725,12 @@ async def schnittstelle_speichern(gid: int, req: Request, ich: dict = Depends(OP
         x.mac_hersteller = x.mac_hersteller or netz.mac_hersteller(mac)
         x.netzwerk_id = int(nid) if nid not in ("", None) else None
         x.feste_ip = bool(d.get("feste_ip"))
+        x.beschreibung = str(d.get("beschreibung") or x.beschreibung or "")[:255]
+        if d.get("art") in ("rj45", "10g", "wifi", "virtuell"):
+            x.art, x.art_fest = d["art"], True
+        else:                                  # automatisch
+            x.art_fest = False
+            x.art = netz.nic_art(f"{x.name} {x.beschreibung}", x.mac_hersteller, x.mac)
         if d.get("primaer"):
             for y in s.scalars(select(Schnittstelle).where(Schnittstelle.geraet_id == gid)):
                 y.primaer = False

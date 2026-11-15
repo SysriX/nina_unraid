@@ -4,6 +4,7 @@
 const typSymbol = t => h("span", { class: "typ-symbol", title: typName(t) }, (META.typen.find(x => x[0] === t) || [])[2] || "◇");
 const typName = t => (META.typen.find(x => x[0] === t) || [t, t])[1];
 const onlineMarke = g => g.online ? h("span", { class: "status-zeile" }, punkt("ok"), "online") : h("span", { class: "status-zeile" }, punkt(""), h("span", { class: "leise" }, "offline"));
+const NIC_ARTEN = { rj45: "RJ45", "10g": "10G / SFP+", wifi: "WLAN", virtuell: "virtuell" };
 const WOL_METHODEN = [["auto", "Automatisch"], ["container", "Container (Broadcast)"], ["opnsense", "OPNsense"], ["beide", "Container + OPNsense"]];
 const ART_NAMEN = { neu: "Neu", online: "Online", offline: "Offline", ip: "IP geändert", wol: "Wake-on-LAN", befehl: "Befehl", agent: "Agent" };
 
@@ -71,7 +72,8 @@ ANSICHT.geraete = { titel: "Geräte", async zeigen(main, q) {
         { t: "Hersteller / Modell", w: g => [g.hersteller, g.modell].filter(Boolean).join(" · ") },
         { t: "Zuletzt online", w: g => g.online ? "jetzt" : vorZeit(g.zuletzt_online), sort: g => g.online ? "9" : g.zuletzt_online || "" },
         { t: "", w: g => h("div", { class: "knopfreihe" }, g.agent ? marke("Agent", g.agent.online ? "ok" : "") : null,
-            g.wol && !g.online && darf("operator") ? h("button", { class: "klein", title: "Wake-on-LAN", onclick: () => wecken(g) }, "Wecken") : null) },
+            g.wol && !g.online && darf("operator") ? h("button", { class: "klein", title: "Wake-on-LAN", onclick: () => wecken(g) }, "Wecken") : null,
+            darf("operator") && ZAHLEN.neu ? h("button", { class: "klein", title: "Einen noch nicht zugewiesenen Fund diesem Gerät hinzufügen", onclick: () => fundHinzufuegenDialog(g).then(r => r && laden()) }, "+ Fund") : null) },
       ], liste, { klick: g => (location.hash = `#geraet?id=${g.id}`), leer: daten.length ? "Kein Gerät passt zum Filter" : "Noch keine Geräte – Netzwerk anlegen und scannen oder von Hand hinzufügen", sortierbar: true })));
   };
   const laden = async () => { daten = (await api("GET", `/api/geraete?status=${FILTER.status}`)).geraete; zeichnen(); };
@@ -185,7 +187,9 @@ function statusKarte(g, neu) {
     h("h2", { style: { marginTop: "16px" } }, "Wake-on-LAN"),
     g.mac || g.wol_mac ? h("div", {},
       h("p", { class: "leise klein-t" }, g.wol_aktiv ? `Weg: ${(WOL_METHODEN.find(x => x[0] === g.wol_methode_wirksam) || [, g.wol_methode_wirksam])[1]}` + (g.wol_netz ? ` · Netz ${g.wol_netz}` : "") : "Wake-on-LAN ist für dieses Gerät aus (Bearbeiten › Wake-on-LAN erlauben)."),
-      g.wol_aktiv ? h("p", { class: "klein-t", style: { marginTop: "-4px" } }, "an ", h("b", { class: "mono" }, g.wol_mac_wirksam), g.wol_mac_hersteller ? h("span", { class: "leise" }, ` (${g.wol_mac_hersteller})`) : null, g.wol_mac ? marke("eigene WoL-MAC", "akz") : null) : null,
+      g.wol_aktiv ? h("p", { class: "klein-t", style: { marginTop: "-4px" } }, "an ", h("b", { class: "mono" }, g.wol_mac_wirksam), g.wol_mac_hersteller ? h("span", { class: "leise" }, ` (${g.wol_mac_hersteller})`) : null, " ",
+        g.wol_art ? marke(NIC_ARTEN[g.wol_art] || g.wol_art, g.wol_art === "rj45" ? "ok" : "warn") : null, " ",
+        g.wol_mac ? marke("eigene WoL-MAC", "akz") : marke("automatisch gewählt")) : null,
       g.wol_aktiv && g.wol_warnung ? h("p", { class: "klein-t", style: { color: "var(--warn)" } }, "Diese Netzwerkkarte (10 Gbit/SFP+) kann Wake-on-LAN meist nicht. Unter Bearbeiten › WoL-MAC die MAC der Onboard-Karte eintragen (Kabel muss stecken, WoL im BIOS an).") : null,
       g.wol_aktiv && darf("operator") ? h("button", { class: "p", onclick: () => wecken(g).then(neu) }, g.online ? "Trotzdem wecken" : "Einschalten (WoL)") : null)
       : h("p", { class: "leise" }, "Keine MAC-Adresse bekannt."));
@@ -194,8 +198,8 @@ function statusKarte(g, neu) {
 function agentHinweis(g) {
   if (!["pc", "laptop", "server", "vm"].includes(g.typ)) return null;
   return h("div", { class: "karte" }, h("h2", {}, "HASS.Agent"),
-    h("p", { class: "leise" }, "Kein HASS.Agent verknüpft. Läuft HASS.Agent auf dem Rechner und nutzt denselben MQTT-Broker, erscheint er unter „Agenten“ und wird über den Namen automatisch verknüpft."),
-    h("a", { href: "#agenten" }, h("button", { class: "klein" }, "Zu den Agenten")));
+    h("p", { class: "leise" }, "Kein HASS.Agent zugewiesen. Läuft HASS.Agent auf dem Rechner und nutzt denselben MQTT-Broker, steht er unter „Nicht zugewiesen“ – dort zuweisen oder hier über „Fund hinzufügen“ (bei den Netzwerk-Schnittstellen)."),
+    h("button", { class: "klein", onclick: () => fundHinzufuegenDialog(g).then(r => r && zeige()) }, "Fund hinzufügen"));
 }
 
 const prozent = w => w.einheit === "%" && !isNaN(parseFloat(w.wert));
@@ -225,12 +229,15 @@ function agentKarte(g, neu) {
 
 function schnittstellenKarte(g) {
   return h("div", { class: "karte" },
-    h("h2", {}, "Netzwerk-Schnittstellen", h("span", { class: "rechts" }, darf("operator") ? h("button", { class: "klein", onclick: () => schnittstelleDialog(g) }, "Hinzufügen") : null)),
+    h("h2", {}, "Netzwerk-Schnittstellen", h("span", { class: "rechts" }, darf("operator") ? [
+      h("button", { class: "klein", onclick: () => fundHinzufuegenDialog(g).then(r => r && zeige()) }, "Fund hinzufügen"),
+      h("button", { class: "klein", onclick: () => schnittstelleDialog(g) }, "Von Hand")] : null)),
     tabelle([
       { t: "", w: x => punkt(x.online ? "ok" : "") },
       { t: "IP", w: x => h("div", { class: "zwei-zeilen" }, h("span", { class: "mono" }, x.ip), x.feste_ip ? h("small", {}, "fest") : null) },
       { t: "MAC", w: x => h("div", { class: "zwei-zeilen" }, h("span", { class: "mono" }, x.mac), x.mac_hersteller ? h("small", {}, x.mac_hersteller) : null) },
-      { t: "Name / Host", w: x => h("div", { class: "zwei-zeilen" }, x.name || x.hostname, x.name && x.hostname ? h("small", {}, x.hostname) : null) },
+      { t: "Name / Host", w: x => h("div", { class: "zwei-zeilen" }, x.name || x.hostname, x.beschreibung ? h("small", {}, x.beschreibung) : x.name && x.hostname ? h("small", {}, x.hostname) : null) },
+      { t: "Art", w: x => x.art ? marke(NIC_ARTEN[x.art] || x.art, x.art === "rj45" ? "ok" : x.art === "10g" ? "akz" : "") : h("span", { class: "leise" }, "?") },
       { t: "Netz", w: x => x.netzwerk },
       { t: "", w: x => [x.primaer ? marke("primär", "akz") : null, " ", marke(x.quelle)] },
       { t: "Zuletzt", w: x => x.online ? "jetzt" : vorZeit(x.zuletzt) },
@@ -243,6 +250,8 @@ async function schnittstelleDialog(g, x = null) {
     feld("IP-Adresse", eingabe("ip", x?.ip)), feld("MAC-Adresse", eingabe("mac", x?.mac, { placeholder: "aa:bb:cc:dd:ee:ff" })),
     feld("Bezeichnung", eingabe("name", x?.name, { placeholder: "z. B. LAN, WLAN" })), feld("Hostname", eingabe("hostname", x?.hostname)),
     feld("Netzwerk", auswahl("netzwerk_id", [["", "automatisch (nach IP)"], ...netze.map(n => [n.id, `${n.name} (${n.cidr})`])], x?.netzwerk_id ?? "")),
+    feld("Art", auswahl("art", [["", "automatisch erkennen"], ...Object.entries(NIC_ARTEN)], x?.art_fest ? x.art : ""), "bestimmt, welche Karte für Wake-on-LAN genommen wird (RJ45 zuerst)"),
+    feld("Adapter-Beschreibung", eingabe("beschreibung", x?.beschreibung, { placeholder: "z. B. Intel I219-V" })),
     h("div", {}, haken("Primäre Schnittstelle", x ? x.primaer : !g.schnittstellen.length, null, "primaer").el, haken("Feste IP (Scan ändert sie nicht)", x?.feste_ip, null, "feste_ip").el));
   const kn = [["Abbrechen", null]];
   if (x) kn.push(["Entfernen", async () => { if (!(await bestaetigen("Schnittstelle entfernen?", "Entfernen"))) return false; return versuch(() => api("DELETE", `/api/schnittstellen/${x.id}`), "Entfernt"); }, "gefahr"]);
@@ -291,6 +300,7 @@ ANSICHT.neu = { titel: "Nicht zugewiesen", async zeigen(main) {
       ign ? h("button", { class: "klein", onclick: () => sammel("anzeigen", `${markiert.length} Funde wieder anzeigen?`, false) }, "Wieder anzeigen") : [
         h("button", { class: "klein p", onclick: () => zuweisenDialog(markiert[0], markiert.slice(1).map(f => f.id)).then(r => { if (r) AUSWAHL.clear(); laden(); }) },
           markiert.length > 1 ? "Zusammen zuweisen" : "Zuweisen"),
+        h("button", { class: "klein", onclick: () => zuGeraetDialog(markiert[0], akt.geraete, markiert.slice(1).map(f => f.id)).then(r => { if (r) AUSWAHL.clear(); laden(); }) }, "Zu Gerät hinzufügen"),
         h("button", { class: "klein", onclick: () => sammel("ignorieren", `${markiert.length} Funde ignorieren? Sie stehen dann unter „Ignoriert“ und tauchen hier nicht wieder auf.`, false) }, "Ignorieren")],
       h("button", { class: "klein gefahr", onclick: () => sammel("entfernen", `${markiert.length} Funde entfernen? Geräte, die noch im Netz sind, tauchen beim nächsten Scan wieder auf. HASS.Agent-Funde werden übersprungen.`, true) }, "Entfernen"),
       h("button", { class: "klein", onclick: () => { AUSWAHL.clear(); zeichnen(); } }, "Auswahl aufheben")) : null;
@@ -368,12 +378,45 @@ async function zuweisenDialog(f, vorgewaehlt = []) {
   }, "p"]], true);
 }
 
-async function zuGeraetDialog(f, alleG) {
-  const sel = auswahl("ziel", alleG.map(x => [x.id, `${x.name}${x.ip ? " – " + x.ip : ""}`]), "");
-  const box = h("div", {}, h("p", { class: "leise" }, `„${f.name || f.ip}“ (${[f.ip, f.mac].filter(Boolean).join(" · ")}) wird dem gewählten Inventar-Gerät hinzugefügt – als weitere Schnittstelle bzw. als dessen HASS.Agent.`),
-    feld("Gerät", sel));
+async function zuGeraetDialog(f, alleG, weitere = []) {
+  const v = await api("GET", `/api/funde/${f.id}/vorschlaege`).catch(() => ({ vorschlaege: [] }));
+  const passend = v.vorschlaege.filter(x => x.art === "geraet" && x.gruende.length);
+  const ids = new Set(passend.map(x => x.id));
+  const rest = alleG.filter(x => !ids.has(x.id)).sort((a, b) => a.name.localeCompare(b.name, "de"));
+  const sel = h("select", { name: "ziel" },
+    passend.length ? h("optgroup", { label: "Passend" }, passend.map(x => h("option", { value: x.id }, `${x.name}${x.ip ? " – " + x.ip : ""} (${x.gruende.join(", ")})`))) : null,
+    h("optgroup", { label: "Alle Geräte" }, rest.map(x => h("option", { value: x.id }, `${x.name}${x.ip ? " – " + x.ip : ""}`))));
+  const text = weitere.length ? `${weitere.length + 1} markierte Funde werden dem gewählten Gerät hinzugefügt` :
+    `„${f.name || f.ip}“ (${[f.ip, f.mac].filter(Boolean).join(" · ")}) wird dem gewählten Gerät hinzugefügt`;
+  const box = h("div", {}, h("p", { class: "leise" }, text + " – als weitere Schnittstelle bzw. als dessen HASS.Agent."), feld("Gerät", sel));
   return dialog("Zu einem Gerät hinzufügen", box, [["Abbrechen", null],
-    ["Hinzufügen", () => versuch(() => api("POST", `/api/funde/${f.id}/zuweisen`, { ziel: +sel.value }), "Hinzugefügt"), "p"]]);
+    ["Hinzufügen", () => versuch(() => api("POST", `/api/funde/${f.id}/zuweisen`, { ziel: +sel.value, weitere }), "Hinzugefügt"), "p"]]);
+}
+
+/** Gerät → offene Funde hinzufügen (passende vorausgewählt). */
+async function fundHinzufuegenDialog(g) {
+  const d = await api("GET", `/api/geraete/${g.id}/funde`);
+  if (!d.funde.length) return hinweis("Unter „Nicht zugewiesen“ gibt es gerade nichts.");
+  const wahl = new Set(d.funde.filter(f => f.gruende.length).map(f => f.id));
+  let filter = "";
+  const liste = h("div");
+  const suche = eingabe("", "", { placeholder: "Suchen: Name, IP, MAC …", oninput: e => { filter = e.target.value.toLowerCase(); zeichne(); } });
+  const zeichne = () => leeren(liste, tabelle([
+    { t: "", w: f => h("input", { type: "checkbox", checked: wahl.has(f.id), onchange: e => { e.target.checked ? wahl.add(f.id) : wahl.delete(f.id); } }) },
+    { t: "Fund", w: f => h("div", { class: "zwei-zeilen" }, h("b", {}, f.name || f.ip || f.mac), f.agent ? h("small", {}, "HASS.Agent " + f.agent.name) : null) },
+    { t: "Erkannt durch", w: f => h("span", { class: "chips" }, quellenMarken(f.quellen)) },
+    { t: "IP / MAC", w: f => h("div", { class: "zwei-zeilen mono" }, f.ip, h("small", {}, f.mac)) },
+    { t: "Passt wegen", w: f => f.gruende.length ? f.gruende.map(r => marke(r, "ok")) : h("span", { class: "leise" }, "–") },
+  ], d.funde.filter(f => !filter || [f.name, f.ip, f.mac, f.hostname, f.agent && f.agent.name].some(x => (x || "").toLowerCase().includes(filter))),
+  { leer: "Kein Fund passt zur Suche" }));
+  zeichne();
+  return dialog(`Funde zu „${g.name}“ hinzufügen`, h("div", {},
+    h("p", { class: "leise klein-t" }, "Die markierten Funde werden diesem Gerät zugewiesen (als weitere Netzwerkschnittstelle bzw. als dessen HASS.Agent). Passende sind vorausgewählt."),
+    suche, liste), [["Abbrechen", null], ["Hinzufügen", async () => {
+      const ids = [...wahl];
+      if (!ids.length) { hinweis("Nichts markiert", true); return false; }
+      return versuch(() => api("POST", `/api/funde/${ids[0]}/zuweisen`, { ziel: g.id, weitere: ids.slice(1) }), `${ids.length} hinzugefügt`);
+    }, "p"]], true);
 }
 
 // ------------------------------------------------------------------ Netzwerke

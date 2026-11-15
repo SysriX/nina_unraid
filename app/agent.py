@@ -546,6 +546,26 @@ class Dienst:
         if not ips:
             return
         self.ips[aid] = set(ips)
+        try:
+            with sitzung() as s:
+                a = s.get(Agent, aid)
+                if not a or not a.geraet_id:
+                    return
+                for x in attrs.get("addresses") or []:
+                    if not isinstance(x, dict) or not x.get("address"):
+                        continue
+                    for sch in s.scalars(select(Schnittstelle).where(Schnittstelle.geraet_id == a.geraet_id,
+                                                                     Schnittstelle.ip == x["address"])):
+                        if x.get("adapter") and not sch.name:
+                            sch.name = str(x["adapter"])[:64]
+                        if x.get("description"):
+                            sch.beschreibung = str(x["description"])[:255]
+                        if not sch.art_fest:
+                            art = netz.nic_art(f"{x.get('adapter', '')} {x.get('description', '')}", sch.mac_hersteller, sch.mac)
+                            if art:
+                                sch.art = art
+        except Exception as e:  # noqa: BLE001
+            kern.log("Agent-Adapter:", e)
 
     def net10_seite(self, aid: int, schluessel: str, seiten: str) -> str:
         """Dienst bevorzugen, wenn er online ist und den Befehl kennt (wie die HA-Integration)."""
@@ -622,7 +642,7 @@ class Dienst:
                         if not ip:
                             continue
                         nw = inventar.netzwerk_fuer_ip(netze, ip)
-                        sch = Schnittstelle(geraet_id=gid, mac=mac, ip=ip, name=name, quelle="agent",
+                        sch = Schnittstelle(geraet_id=gid, mac=mac, ip=ip, name=name, quelle="agent", art=netz.nic_art(name, netz.mac_hersteller(mac), mac),
                                             mac_hersteller=netz.mac_hersteller(mac), netzwerk_id=nw.id if nw else None,
                                             online=True, zuletzt=jetzt())
                         s.add(sch)
@@ -698,6 +718,21 @@ def abgleich(offline_nach_min: int = 10, neu_melden: bool = False) -> dict:
                 funde.agent_fund(s, a)
                 verknuepft += 1
         ids = [(a.id, a.online, kern.utc(a.zuletzt)) for a in agenten]
+        adapter = []
+        for a in agenten:      # gespeicherte Adapter-Infos (Name, Beschreibung → Art der Karte) auf die Schnittstellen übertragen
+            if not a.geraet_id:
+                continue
+            w = s.scalars(select(AgentWert).where(AgentWert.agent_id == a.id, AgentWert.schluessel == "network_address")).first()
+            attr = w.attribute if w else None
+            if isinstance(attr, str):
+                try:
+                    attr = json.loads(attr)
+                except ValueError:
+                    attr = None
+            if isinstance(attr, dict) and attr.get("addresses"):
+                adapter.append((a.id, attr))
+    for aid, attr in adapter:
+        DIENST._ips_merken(aid, attr)
     for aid, an, zuletzt in ids:
         live = DIENST.online.get(aid)
         letzte = max(live[1] if live else 0, zuletzt.timestamp() if zuletzt else 0)

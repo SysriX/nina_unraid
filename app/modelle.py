@@ -134,6 +134,9 @@ class Schnittstelle(Basis):
     name: Mapped[str] = mapped_column(String(64), default="")
     mac: Mapped[str] = mapped_column(String(17), default="", index=True)  # aa:bb:cc:dd:ee:ff
     ip: Mapped[str] = mapped_column(String(64), default="", index=True)
+    art: Mapped[str] = mapped_column(String(16), default="")            # rj45 | 10g | wifi | virtuell | "" (ab Schema 4)
+    art_fest: Mapped[bool] = mapped_column(Boolean, default=False)      # von Hand gesetzt – Erkennung überschreibt nicht
+    beschreibung: Mapped[str] = mapped_column(String(255), default="")  # Adapter laut HASS.Agent, z. B. „Intel 82599 10 Gigabit“
     hostname: Mapped[str] = mapped_column(String(255), default="")
     mac_hersteller: Mapped[str] = mapped_column(String(128), default="")
     netzwerk_id: Mapped[int | None] = mapped_column(ForeignKey("ni_netzwerk.id", ondelete="SET NULL"), nullable=True)

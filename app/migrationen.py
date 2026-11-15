@@ -9,7 +9,7 @@ So funktioniert ein Update des Containers:
   * Danach legt create_all() noch fehlende (neue) Tabellen an.
 
 Neuen Schritt hinzufügen (Beispiel Version 2):
-    AKTUELL = 3
+    AKTUELL = 4
     def _v2(c):
         spalte_neu(c, "ni_geraet", Column("garantie_bis", Date, nullable=True))
     SCHRITTE[2] = ("Garantie-Datum für Geräte", _v2)
@@ -28,7 +28,7 @@ from sqlalchemy.schema import CreateIndex
 import kern
 from modelle import Basis, Schema
 
-AKTUELL = 3
+AKTUELL = 4
 SCHRITTE: dict[int, tuple[str, Callable[[Connection], None]]] = {}
 
 
@@ -40,7 +40,7 @@ def spalte_neu(c: Connection, tabelle: str, spalte: Column) -> None:
     sql = f"ALTER TABLE {tabelle} ADD COLUMN {spalte.name} {typ}"
     if spalte.server_default is not None:
         arg = spalte.server_default.arg
-        sql += f" DEFAULT '{arg}'" if isinstance(arg, str) else f" DEFAULT {arg}"
+        sql += f" DEFAULT {arg}" if (not isinstance(arg, str) or arg.isdigit()) else f" DEFAULT '{arg}'"
     if not spalte.nullable and spalte.server_default is not None:
         sql += " NOT NULL"
     c.execute(text(sql))
@@ -115,6 +115,22 @@ def _v3(c: Connection) -> None:
 
 
 SCHRITTE[3] = ("Nicht zugewiesene Funde in eigener Tabelle (ni_fund), WoL-MAC je Gerät", _v3)
+
+
+def _v4(c: Connection) -> None:
+    """Art der Netzwerkschnittstelle (RJ45, 10G, WLAN, virtuell) – für die automatische WoL-MAC."""
+    from sqlalchemy import Boolean, String
+    import netz
+    spalte_neu(c, "ni_schnittstelle", Column("art", String(16), server_default="", nullable=False))
+    spalte_neu(c, "ni_schnittstelle", Column("art_fest", Boolean, server_default="0", nullable=False))
+    spalte_neu(c, "ni_schnittstelle", Column("beschreibung", String(255), server_default="", nullable=False))
+    for sid, name, hst, mac in c.execute(text("SELECT id, name, mac_hersteller, mac FROM ni_schnittstelle")).all():
+        art = netz.nic_art(name or "", hst or "", mac or "")
+        if art:
+            c.execute(text("UPDATE ni_schnittstelle SET art = :a WHERE id = :i"), {"a": art, "i": sid})
+
+
+SCHRITTE[4] = ("Art der Netzwerkschnittstelle (RJ45/10G/WLAN/virtuell)", _v4)
 
 
 # ------------------------------------------------------------------ Ablauf

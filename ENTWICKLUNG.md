@@ -28,6 +28,7 @@
 | 1 | 1.0.0 | Grundschema |
 | 2 | 1.1.0 | `ni_typ`, `ni_geraet_typ`, `ni_hersteller`, `ni_modell`; Geräte mit ihrem Typ verknüpft, Hersteller/Modelle aus dem Inventar übernommen |
 | 3 | 2.0.0 | `ni_fund` (nicht zugewiesene Funde); Geräte mit Status neu/ignoriert und Agenten ohne Gerät wandern dorthin; `ni_geraet.wol_mac` |
+| 4 | 2.2.0 | `ni_schnittstelle.art`, `art_fest`, `beschreibung` (Art der Netzwerkkarte für die automatische WoL-MAC) |
 
 ## Datenbank ändern
 

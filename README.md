@@ -13,6 +13,8 @@ Home-Assistant-Integration: [nina_ha_integration](https://github.com/SysriX/nina
 ![Nicht zugewiesene Funde aus Scan, OPNsense und HASS.Agent](docs/images/neu.png)
 *Beispieldaten*
 
+> **2.2.0:** Funde und Geräte in beide Richtungen zuweisen („Fund hinzufügen“ in Geräteliste und Geräteseite, „Zu Gerät hinzufügen“ auch für mehrere markierte Funde, passende zuerst). Art der Netzwerkkarte (RJ45, 10G/SFP+, WLAN, virtuell) aus Adapterbeschreibung (HASS.Agent) und Hersteller, von Hand änderbar; ohne eigene WoL-MAC wird automatisch die RJ45-Karte geweckt. Datenbank-Schema 4.
+>
 > **2.1.1:** Alle Listen passen sich der Fensterbreite an (volle Breite, Umbruch nur an Wortgrenzen, Knopfspalte bleibt rechts sichtbar).
 >
 > **2.1.0:** Mehrfachauswahl unter „Nicht zugewiesen“ (zusammen zuweisen, ignorieren, wieder anzeigen, entfernen); Knopfspalte breiter Listen bleibt rechts sichtbar.

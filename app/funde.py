@@ -220,7 +220,8 @@ def _uebernehmen(s, f: Fund, g: Geraet) -> None:
             primaer = not s.scalar(select(func.count(Schnittstelle.id)).where(Schnittstelle.geraet_id == g.id))
             q = next((q for q in (f.quellen or []) if q != "agent"), "scan")
             s.add(Schnittstelle(geraet_id=g.id, mac=f.mac, ip=f.ip, hostname=f.hostname, mac_hersteller=f.mac_hersteller,
-                                netzwerk_id=f.netzwerk_id, primaer=primaer, quelle=q, online=f.online, zuletzt=f.zuletzt))
+                                netzwerk_id=f.netzwerk_id, primaer=primaer, quelle=q, online=f.online, zuletzt=f.zuletzt,
+                                art=netz.nic_art("", f.mac_hersteller, f.mac)))
             if f.mac:
                 g.wol_aktiv = g.wol_aktiv or g.typ in ("pc", "laptop", "server", "nas")
     if f.agent_id:
@@ -393,3 +394,33 @@ async def sammel(req: Request, ich: dict = Depends(OPERATOR)):
     protokoll(ich["name"], "funde", f"Sammel-Aktion {aktion}", details=f"{erledigt} Funde, {agenten} HASS.Agent übersprungen",
               ip=client_ip(req))
     return {"ok": True, "erledigt": erledigt, "agenten_uebersprungen": agenten}
+
+
+# ------------------------------------------------------------------ Gerät → passende offene Funde
+@router.get("/geraete/{gid}/funde")
+def funde_fuer_geraet(gid: int, ich: dict = Depends(LESER)):
+    """Alle offenen Funde, die einem Gerät hinzugefügt werden können – passende (Name/IP/MAC) zuerst, mit Grund."""
+    with sitzung() as s:
+        g = s.get(Geraet, gid)
+        if not g:
+            raise LookupError("Gerät gibt es nicht")
+        schs = list(s.scalars(select(Schnittstelle).where(Schnittstelle.geraet_id == gid)))
+        namen = {_kurz(g.name).lower()} | {_kurz(x.hostname).lower() for x in schs if x.hostname}
+        ips, macs = {x.ip for x in schs if x.ip}, {x.mac for x in schs if x.mac}
+        a = s.scalars(select(Agent).where(Agent.geraet_id == gid)).first()
+        if a:
+            import agent as agent_mod
+            namen.add(a.name.lower())
+            ips |= agent_mod.agent_ips(a.id)
+        netze = {n.id: n.name for n in s.scalars(select(Netzwerk))}
+        tn = {t.schluessel: t.name for t in s.scalars(select(Typ))}
+        out = []
+        for f in s.scalars(select(Fund).where(Fund.ignoriert.is_(False))):
+            fn = {x.lower() for x in (_kurz(f.name), _kurz(f.hostname)) if x}
+            fips = ({f.ip} if f.ip else set()) | _agent_ips(s, f)
+            j = fund_json(s, f, netze, tn)
+            j["gruende"] = (["gleicher Name"] if namen & fn else []) + (["gleiche MAC"] if f.mac and f.mac in macs else []) \
+                + (["gleiche IP"] if ips & fips else [])
+            out.append(j)
+        out.sort(key=lambda x: (-len(x["gruende"]), (x["name"] or "").lower()))
+        return {"funde": out}
