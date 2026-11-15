@@ -13,6 +13,8 @@ Home-Assistant-Integration: [nina_ha_integration](https://github.com/SysriX/nina
 ![Nicht zugewiesene Funde aus Scan, OPNsense und HASS.Agent](docs/images/neu.png)
 *Beispieldaten*
 
+> **2.1.1:** Alle Listen passen sich der Fensterbreite an (volle Breite, Umbruch nur an Wortgrenzen, Knopfspalte bleibt rechts sichtbar).
+>
 > **2.1.0:** Mehrfachauswahl unter „Nicht zugewiesen“ (zusammen zuweisen, ignorieren, wieder anzeigen, entfernen); Knopfspalte breiter Listen bleibt rechts sichtbar.
 >
 > **2.0.1:** Anzeige mehrerer Typen korrigiert (Haupttyp steht immer zuerst, kein Typ fällt mehr weg).

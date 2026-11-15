@@ -69,9 +69,10 @@ ANSICHT.geraete = { titel: "Geräte", async zeigen(main, q) {
         { t: "MAC", w: g => h("span", { class: "mono" }, g.mac) },
         { t: "Netz", w: g => g.netzwerk },
         { t: "Hersteller / Modell", w: g => [g.hersteller, g.modell].filter(Boolean).join(" · ") },
-        { t: "", w: g => [g.agent ? marke("Agent", g.agent.online ? "ok" : "") : null, " ", g.wol && !g.online && darf("operator") ? h("button", { class: "klein", title: "Wake-on-LAN", onclick: () => wecken(g) }, "Wecken") : null] },
         { t: "Zuletzt online", w: g => g.online ? "jetzt" : vorZeit(g.zuletzt_online), sort: g => g.online ? "9" : g.zuletzt_online || "" },
-      ], liste, { klick: g => (location.hash = `#geraet?id=${g.id}`), leer: daten.length ? "Kein Gerät passt zum Filter" : "Noch keine Geräte – Netzwerk anlegen und scannen oder von Hand hinzufügen", sortierbar: true, klebend: true })));
+        { t: "", w: g => h("div", { class: "knopfreihe" }, g.agent ? marke("Agent", g.agent.online ? "ok" : "") : null,
+            g.wol && !g.online && darf("operator") ? h("button", { class: "klein", title: "Wake-on-LAN", onclick: () => wecken(g) }, "Wecken") : null) },
+      ], liste, { klick: g => (location.hash = `#geraet?id=${g.id}`), leer: daten.length ? "Kein Gerät passt zum Filter" : "Noch keine Geräte – Netzwerk anlegen und scannen oder von Hand hinzufügen", sortierbar: true })));
   };
   const laden = async () => { daten = (await api("GET", `/api/geraete?status=${FILTER.status}`)).geraete; zeichnen(); };
   const netze = [...new Set((await api("GET", "/api/netzwerke")).netzwerke.map(n => n.name))];

@@ -153,7 +153,6 @@ td .zwei-zeilen small{display:block;color:var(--leise);font-size:12px}
 [data-stil=konsole] .balken i{box-shadow:0 0 8px var(--akzent)}
 .mono{white-space:nowrap}
 .log .marke{flex:none;align-self:flex-start}
-.tab-wrap td{white-space:nowrap}
 .chip.an{background:color-mix(in srgb,var(--akzent) 22%,transparent);color:var(--text)}
 .chips label.chip{gap:2px;padding:3px 10px 3px 6px;white-space:nowrap}
 .chips label.chip input{width:auto;margin:0 4px 0 0}
@@ -184,7 +183,14 @@ aside{display:flex;flex-direction:column}
 .auswahl-leiste b{margin-right:6px}
 
 /* breite Listen: Seite breiter nutzen, Knopfspalte rechts immer sichtbar */
-main{max-width:1680px}
+
 .tab-wrap.klebend th:last-child,.tab-wrap.klebend td:last-child{position:sticky;right:0;z-index:1;background:var(--karte);box-shadow:-10px 0 12px -10px rgba(0,0,0,.6)}
 [data-stil=konsole] .tab-wrap.klebend th:last-child,[data-stil=konsole] .tab-wrap.klebend td:last-child{background:#1c1d21}
 .tab-wrap.klebend tr.an td:last-child{background:color-mix(in srgb,var(--akzent) 9%,var(--karte))}
+
+/* Listen passen sich der Fensterbreite an: volle Breite, Umbruch nur an Wortgrenzen, Adressen einzeilig */
+main{max-width:none}
+.tab-wrap table{width:100%}
+.tab-wrap td,.tab-wrap th{overflow-wrap:normal;word-break:normal}
+.tab-wrap td .mono,.tab-wrap td.z,.tab-wrap th{white-space:nowrap}
+.tab-wrap td .marke,.tab-wrap td .chip{white-space:nowrap}
